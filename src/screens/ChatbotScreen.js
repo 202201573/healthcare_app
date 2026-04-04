@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
+import { LanguageContext } from '../context/LanguageContext';
 
-const ChatbotScreen = () => {
+const ChatbotScreen = ({ navigation }) => {
+  const { t } = useContext(LanguageContext);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  
+  const flatListRef = useRef(null);
 
   useEffect(() => {
     fetchMessages();
@@ -55,7 +62,9 @@ const ChatbotScreen = () => {
             </View>
         ): null}
         <Text style={[styles.messageText, item.sender === 'user' ? styles.userText : styles.aiText]}>{item.message}</Text>
-        <Text style={styles.timeText}>10:44 AM</Text>
+        <Text style={[styles.timeText, item.sender === 'user' ? {color: 'rgba(255,255,255,0.7)'} : null]}>
+            {new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
       </View>
       {item.sender === 'user' && (
         <View style={styles.userAvatarWrapper}>
@@ -65,41 +74,97 @@ const ChatbotScreen = () => {
     </View>
   );
 
+  const filteredMessages = messages.filter(msg => 
+    msg.message.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#4ba1ff', '#2d7df6']} style={styles.header}>
-        <View style={styles.headerIconGrp}>
-          <View style={styles.headerAiAvatar}><Ionicons name="happy" size={24} color="#ff4b4b" /></View>
-          <View style={{marginLeft: 15}}>
-             <Text style={styles.headerTitle}>PulseGuard AI</Text>
-             <Text style={styles.headerStatus}>• Online & Monitoring</Text>
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-           <Ionicons name="search" size={24} color="#fff" style={{marginRight: 15}} />
-           <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
-        </View>
+        {isSearching ? (
+            <View style={styles.searchHeaderInner}>
+                <TouchableOpacity onPress={() => {setIsSearching(false); setSearchQuery('');}}>
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                </TouchableOpacity>
+                <TextInput 
+                    style={styles.headerSearchInput}
+                    placeholder="Search messages..."
+                    placeholderTextColor="rgba(255,255,255,0.7)"
+                    autoFocus
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+        ) : (
+            <>
+                <View style={styles.headerIconGrp}>
+                <View style={styles.headerAiAvatar}><Ionicons name="happy" size={24} color="#ff4b4b" /></View>
+                <View style={{marginLeft: 15}}>
+                    <Text style={styles.headerTitle}>PulseGuard AI</Text>
+                    <Text style={styles.headerStatus}>• Online & Monitoring</Text>
+                </View>
+                </View>
+                <View style={styles.headerActions}>
+                <TouchableOpacity onPress={() => setIsSearching(true)}>
+                    <Ionicons name="search" size={24} color="#fff" style={{marginRight: 15}} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setMenuVisible(true)}>
+                    <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+                </TouchableOpacity>
+                </View>
+            </>
+        )}
       </LinearGradient>
+
+      {/* Menu Modal */}
+      <Modal visible={menuVisible} transparent animationType="fade">
+          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+              <View style={styles.menuBox}>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Home');}}>
+                      <Ionicons name="home-outline" size={20} color="#333" />
+                      <Text style={styles.menuItemText}>{t('home')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Dashboard');}}>
+                      <Ionicons name="stats-chart-outline" size={20} color="#333" />
+                      <Text style={styles.menuItemText}>{t('dashboard')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Profile');}}>
+                      <Ionicons name="person-outline" size={20} color="#333" />
+                      <Text style={styles.menuItemText}>{t('profile')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+                      <Ionicons name="settings-outline" size={20} color="#333" />
+                      <Text style={styles.menuItemText}>{t('settings')}</Text>
+                  </TouchableOpacity>
+              </View>
+          </TouchableOpacity>
+      </Modal>
 
       <KeyboardAvoidingView style={styles.contentWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
-          data={messages.length > 0 ? messages : [{id: '1', sender: 'ai', message: "Hello! I've analyzed your vitals. Your heart rate looks normal today - 86 bpm. Anything specific you'd like to know?"}]}
+          ref={flatListRef}
+          data={searchQuery ? filteredMessages : (messages.length > 0 ? messages : [{id: '1', sender: 'ai', message: "Hello! I've analyzed your vitals. Your heart rate looks normal today - 86 bpm. Anything specific you'd like to know?"}])}
           keyExtractor={item => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.chatList}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => !searchQuery && flatListRef.current?.scrollToEnd({animated: true})}
+          onLayout={() => !searchQuery && flatListRef.current?.scrollToEnd({animated: true})}
         />
 
         <View style={styles.bottomArea}>
            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promptsRow}>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Show my heart history")}>
-               <Text style={styles.promptText}>Show my heart history</Text>
+             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Generate a 7-day health schedule for me")}>
+               <Text style={styles.promptText}>🗓️ 7-Day Schedule</Text>
              </TouchableOpacity>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Am I at risk?")}>
-               <Text style={styles.promptText}>Am I at risk?</Text>
+             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("What are the risks of heart disease?")}>
+               <Text style={styles.promptText}>🫀 Risk Analysis</Text>
              </TouchableOpacity>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Sleep tips")}>
-               <Text style={styles.promptText}>Sleep tips</Text>
+             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Explain my latest health data")}>
+               <Text style={styles.promptText}>💡 Data Insight</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Give me 5 sleep tips")}>
+               <Text style={styles.promptText}>🌙 Sleep Tips</Text>
              </TouchableOpacity>
            </ScrollView>
            
@@ -162,6 +227,52 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row'
+  },
+  searchHeaderInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 40
+  },
+  headerSearchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 15,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 20
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 20
+  },
+  menuBox: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    width: 180,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '500'
   },
   contentWrap: {
     flex: 1

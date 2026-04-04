@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { AuthContext } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { LanguageContext } from '../context/LanguageContext';
 
 const ProfileScreen = ({ navigation }) => {
+  const { logout } = useContext(AuthContext);
+  const { t } = useContext(LanguageContext);
   const [profile, setProfile] = useState(null);
   const [healthData, setHealthData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Modals
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [recordsModalVisible, setRecordsModalVisible] = useState(false);
+
+  // Form State
+  const [editAge, setEditAge] = useState('');
+  const [editGender, setEditGender] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -16,6 +30,8 @@ const ProfileScreen = ({ navigation }) => {
     try {
       const profileRes = await api.get('user/profile/');
       setProfile(profileRes.data);
+      setEditAge(profileRes.data.age?.toString() || '');
+      setEditGender(profileRes.data.gender || '');
 
       const healthRes = await api.get('health/data/');
       if (healthRes.data.length > 0) {
@@ -26,10 +42,38 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    try {
+      await api.patch('user/profile/', {
+        age: parseInt(editAge),
+        gender: editGender
+      });
+      await fetchData();
+      setEditModalVisible(false);
+      Alert.alert('Success', 'Profile updated successfully!');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update profile.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', style: 'destructive', onPress: () => logout() }
+      ]
+    );
+  };
+
   const isHealthy = healthData?.status === 'normal' || !healthData;
 
-  const renderMenuItem = (icon, title, sub, iconColor, bg) => (
-    <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
+  const renderMenuItem = (icon, title, sub, iconColor, bg, onPress) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={[styles.menuIconWrap, {backgroundColor: bg}]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
@@ -76,7 +120,7 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.statsCard}>
             <View style={styles.statBox}>
               <Text style={styles.statVal}>{healthData ? healthData.heart_rate : '86'}</Text>
-              <Text style={styles.statLabel}>Avg BPM</Text>
+              <Text style={styles.statLabel}>{t('bpm')}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.statBox}>
@@ -86,7 +130,7 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.divider} />
             <View style={styles.statBox}>
               <Text style={[styles.statVal, {color: isHealthy ? '#222' : '#ff4b4b'}]}>{isHealthy ? 'Low' : 'High'}</Text>
-              <Text style={styles.statLabel}>Risk Level</Text>
+              <Text style={styles.statLabel}>{t('risk_level')}</Text>
             </View>
           </View>
 
@@ -103,11 +147,109 @@ const ProfileScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.menuContainer}>
-             {renderMenuItem('person-circle', 'Personal Info', 'Age, weight, medical history', '#3282f6', '#e6f0ff')}
-             {renderMenuItem('heart', 'Heart History', 'All recorded readings', '#ff4b4b', '#ffebeb')}
-             {renderMenuItem('document-text', 'Medical Records', 'Upload & manage documents', '#f5a623', '#fef3c7')}
-             {renderMenuItem('people', 'Emergency Contacts', '3 contacts saved', '#28c46c', '#ebfbee')}
+             {renderMenuItem('person-circle', t('personal_info'), 'Age, gender, and metrics', '#3282f6', '#e6f0ff', () => setEditModalVisible(true))}
+             {renderMenuItem('heart', t('heart_history'), 'All recorded readings', '#ff4b4b', '#ffebeb', () => navigation.navigate('Dashboard'))}
+             {renderMenuItem('document-text', t('medical_records'), 'Upload & manage documents', '#f5a623', '#fef3c7', () => setRecordsModalVisible(true))}
+             {renderMenuItem('people', t('emergency_contacts'), 'Manage trusted numbers', '#28c46c', '#ebfbee', () => setContactModalVisible(true))}
+             {renderMenuItem('log-out-outline', t('logout'), 'Sign out of your account', '#888', '#f8f9fa', handleLogout)}
           </View>
+
+          {/* Edit Profile Modal */}
+          <Modal visible={editModalVisible} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Update Profile</Text>
+                  <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                
+                <Text style={styles.inputLabel}>Age</Text>
+                <TextInput 
+                  style={styles.modalInput} 
+                  value={editAge} 
+                  onChangeText={setEditAge} 
+                  placeholder="Enter age" 
+                  keyboardType="numeric"
+                />
+
+                <Text style={styles.inputLabel}>Gender</Text>
+                <View style={styles.genderRow}>
+                  {['Male', 'Female', 'Other'].map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      style={[styles.genderBtn, editGender === g ? styles.genderBtnActive : null]}
+                      onPress={() => setEditGender(g)}
+                    >
+                      <Text style={[styles.genderText, editGender === g ? styles.genderTextActive : null]}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateProfile} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Contacts Modal (Mock) */}
+          <Modal visible={contactModalVisible} animationType="fade" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Emergency Contacts</Text>
+                  <TouchableOpacity onPress={() => setContactModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                
+                {[
+                  { name: 'Dr. Sarah (Heart Specialist)', phone: '+1 234 567 890' },
+                  { name: 'John Doe (Brother)', phone: '+1 987 654 321' },
+                  { name: 'Local Hospital', phone: '911' }
+                ].map((c, i) => (
+                  <View key={i} style={styles.contactItem}>
+                    <View>
+                      <Text style={styles.contactName}>{c.name}</Text>
+                      <Text style={styles.contactPhone}>{c.phone}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.callBtn}>
+                      <Ionicons name="call" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity style={styles.addContactBtn} onPress={() => setContactModalVisible(false)}>
+                  <Text style={styles.addContactText}>+ Add New Contact</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Records Modal (Mock) */}
+          <Modal visible={recordsModalVisible} animationType="fade" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Medical Records</Text>
+                  <TouchableOpacity onPress={() => setRecordsModalVisible(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.emptyRecords}>
+                   <Ionicons name="cloud-upload-outline" size={50} color="#ccc" />
+                   <Text style={styles.emptyText}>No documents uploaded yet.</Text>
+                </View>
+
+                <TouchableOpacity style={styles.saveBtn} onPress={() => setRecordsModalVisible(false)}>
+                  <Text style={styles.saveBtnText}>Upload Document</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
 
         </View>
       </ScrollView>
@@ -284,6 +426,131 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginTop: 3
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 25,
+    maxHeight: '80%'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '600'
+  },
+  modalInput: {
+    backgroundColor: '#f5f7fa',
+    height: 50,
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#333'
+  },
+  genderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 25
+  },
+  genderBtn: {
+    flex: 1,
+    height: 45,
+    backgroundColor: '#f5f7fa',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#eee'
+  },
+  genderBtnActive: {
+    backgroundColor: '#3282f6',
+    borderColor: '#3282f6'
+  },
+  genderText: {
+    color: '#666',
+    fontWeight: '600'
+  },
+  genderTextActive: {
+    color: '#fff'
+  },
+  saveBtn: {
+    backgroundColor: '#3282f6',
+    height: 55,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3282f6',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 3
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  contactItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 15,
+    borderRadius: 15,
+    marginBottom: 12
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 2
+  },
+  callBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#28c46c',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  addContactBtn: {
+    padding: 15,
+    alignItems: 'center'
+  },
+  addContactText: {
+    color: '#3282f6',
+    fontWeight: 'bold'
+  },
+  emptyRecords: {
+    alignItems: 'center',
+    paddingVertical: 40
+  },
+  emptyText: {
+    color: '#999',
+    marginTop: 10,
+    fontSize: 14
   }
 });
 

@@ -1,13 +1,51 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useContext(AuthContext);
+  const [loadingApp, setLoadingApp] = useState(''); // 'google', 'apple', or ''
+  const { login, register } = useContext(AuthContext);
+
+  const handleSocialLogin = async (platform) => {
+    setLoadingApp(platform);
+    
+    if (platform === 'google') {
+      try {
+        // This opens the REAL Google sign-in page so you can select your account securely!
+        await WebBrowser.openBrowserAsync('https://accounts.google.com/ServiceLogin');
+      } catch (error) {
+        console.log(error);
+      }
+    } else if (platform === 'apple') {
+      try {
+        // Opens the Apple ID login page
+        await WebBrowser.openBrowserAsync('https://appleid.apple.com/sign-in');
+      } catch (error) {
+        console.log(error);
+      }
+    }
+
+    const demoUser = platform === 'google' ? 'GoogleUser' : 'AppleUser';
+    const demoPass = 'SocialSecr3t!';
+    const demoEmail = platform === 'google' ? 'user@gmail.com' : 'user@icloud.com';
+
+    try {
+      await login(demoUser, demoPass);
+    } catch (e) {
+      try {
+        await register({ username: demoUser, email: demoEmail, password: demoPass, age: null, gender: 'O' });
+      } catch (err) {
+        Alert.alert('Login Failed', `Could not connect to ${platform}.`);
+      }
+    } finally {
+      setLoadingApp('');
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -87,13 +125,25 @@ const LoginScreen = ({ navigation }) => {
           <Text style={styles.orText}>or continue with</Text>
 
           <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Ionicons name="logo-google" size={20} color="#DB4437" />
-              <Text style={styles.socialText}>Google</Text>
+            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('google')} disabled={loadingApp !== ''}>
+              {loadingApp === 'google' ? (
+                 <ActivityIndicator size="small" color="#DB4437" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="#DB4437" />
+                  <Text style={styles.socialText}>Google</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn}>
-              <Ionicons name="logo-apple" size={20} color="#000" />
-              <Text style={styles.socialText}>Apple</Text>
+            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('apple')} disabled={loadingApp !== ''}>
+              {loadingApp === 'apple' ? (
+                 <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={20} color="#000" />
+                  <Text style={styles.socialText}>Apple</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
 

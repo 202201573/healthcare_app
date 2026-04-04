@@ -1,15 +1,27 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
+import { LanguageContext } from '../context/LanguageContext';
 
 const SettingsScreen = ({ navigation }) => {
   const { logout } = useContext(AuthContext);
+  const { t, locale, changeLanguage } = useContext(LanguageContext);
   
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [liveSyncEnabled, setLiveSyncEnabled] = useState(true);
   const [emergencyEnabled, setEmergencyEnabled] = useState(false);
+
+  // New states for interactive sections
+  const [notiModalVisible, setNotiModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  
+  // Specific settings states
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [reportEnabled, setReportEnabled] = useState(true);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to exit?", [
@@ -58,7 +70,7 @@ const SettingsScreen = ({ navigation }) => {
                 <Ionicons name="arrow-back" size={24} color="#333" />
             </TouchableOpacity>
             <View>
-              <Text style={styles.headerTitle}>Settings</Text>
+              <Text style={styles.headerTitle}>{t('settings')}</Text>
               <Text style={styles.headerSub}>Customize your experience</Text>
             </View>
         </View>
@@ -81,7 +93,7 @@ const SettingsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </LinearGradient>
 
-        <Text style={styles.sectionHeader}>MONITORING</Text>
+        <Text style={styles.sectionHeader}>{t('monitoring')}</Text>
         <View style={styles.cardBlock}>
           {renderToggle('heart', 'Heart Rate Alerts', 'Notify when abnormal', '#ff4b4b', '#ffebeb', alertsEnabled, setAlertsEnabled)}
           <View style={styles.divider} />
@@ -90,18 +102,93 @@ const SettingsScreen = ({ navigation }) => {
           {renderToggle('warning', 'Emergency Alert', 'Auto-call contacts', '#f5a623', '#fef3c7', emergencyEnabled, setEmergencyEnabled)}
         </View>
 
-        <Text style={styles.sectionHeader}>APP PREFERENCES</Text>
+        <Text style={styles.sectionHeader}>{t('app_preferences')}</Text>
         <View style={styles.cardBlock}>
-          {renderLink('notifications', 'Notifications', 'Manage reminders', '#f5a623', '#fef3c7')}
+          {renderLink('notifications', t('notifications'), 'Manage reminders', '#f5a623', '#fef3c7', () => setNotiModalVisible(true))}
           <View style={styles.divider} />
-          {renderLink('globe', 'Language', 'English', '#3282f6', '#e6f0ff')}
+          {renderLink('globe', t('language'), locale === 'en' ? 'English' : 'العربية', '#3282f6', '#e6f0ff', () => setLangModalVisible(true))}
           <View style={styles.divider} />
-          {renderLink('lock-closed', 'Privacy & Security', 'Data & permissions', '#845ef7', '#f1f0ff')}
+          {renderLink('lock-closed', t('privacy'), 'Data & permissions', '#845ef7', '#f1f0ff', () => setPrivacyModalVisible(true))}
           <View style={styles.divider} />
           {renderLink('help-circle', 'Help & Support', 'FAQ & Contact', '#28c46c', '#ebfbee', () => navigation.navigate('Help'))}
           <View style={styles.divider} />
-          {renderLink('log-out', 'Sign Out', null, '#ff4b4b', '#fff0f0', handleLogout)}
+          {renderLink('log-out', t('logout'), null, '#ff4b4b', '#fff0f0', handleLogout)}
         </View>
+
+        {/* --- MODALS --- */}
+
+        {/* Notifications Modal */}
+        <Modal visible={notiModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Notification Settings</Text>
+                <TouchableOpacity onPress={() => setNotiModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              {renderToggle('notifications', 'Push Notifications', 'Real-time health alerts', '#3282f6', '#e6f0ff', pushEnabled, setPushEnabled)}
+              <View style={styles.divider} />
+              {renderToggle('document-text', 'Daily Health Reports', 'Evening health summary', '#28c46c', '#ebfbee', reportEnabled, setReportEnabled)}
+              <TouchableOpacity style={styles.saveBtn} onPress={() => setNotiModalVisible(false)}>
+                <Text style={styles.saveBtnText}>{t('done')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Language Modal */}
+        <Modal visible={langModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Language</Text>
+                <TouchableOpacity onPress={() => setLangModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              {['English', 'العربية (Arabic)', 'Français (French)', 'Español (Spanish)'].map((lang, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  style={styles.langItem} 
+                  onPress={() => {
+                    const newLocale = lang.includes('Arabic') ? 'ar' : 'en';
+                    changeLanguage(newLocale);
+                    setLangModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.langText, (locale === 'ar' && lang.includes('Arabic')) || (locale === 'en' && lang === 'English') ? styles.langActive : null]}>{lang}</Text>
+                  {((locale === 'ar' && lang.includes('Arabic')) || (locale === 'en' && lang === 'English')) && <Ionicons name="checkmark-circle" size={20} color="#3282f6" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Privacy & Security Modal */}
+        <Modal visible={privacyModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Privacy & Security</Text>
+                <TouchableOpacity onPress={() => setPrivacyModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              {renderToggle('finger-print', 'Biometric Lock', 'Use FaceID/Fingerprint', '#845ef7', '#f1f0ff', biometricEnabled, setBiometricEnabled)}
+              <View style={styles.divider} />
+              {renderLink('trash-outline', 'Clear Chat History', 'Delete all AI records', '#ff4b4b', '#fff0f0', () => {
+                Alert.alert("Confirm", "Delete all chat history permanently?", [
+                  { text: 'Cancel' },
+                  { text: 'Delete', style: 'destructive' }
+                ])
+              })}
+              <TouchableOpacity style={styles.saveBtn} onPress={() => setPrivacyModalVisible(false)}>
+                <Text style={styles.saveBtnText}>Save Preferences</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
       </ScrollView>
     </View>
@@ -224,6 +311,57 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 1,
     backgroundColor: '#f0f0f0'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 25,
+    paddingBottom: 40
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  saveBtn: {
+    backgroundColor: '#3282f6',
+    padding: 16,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginTop: 20
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
+  langItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5'
+  },
+  langText: {
+    fontSize: 16,
+    color: '#333'
+  },
+  langActive: {
+    color: '#3282f6',
+    fontWeight: 'bold'
   }
 });
 

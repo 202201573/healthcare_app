@@ -1,20 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Image } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Image, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
+import { AuthContext } from '../context/AuthContext';
+import { LanguageContext } from '../context/LanguageContext';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
+  const { logout } = useContext(AuthContext);
+  const { t } = useContext(LanguageContext);
   const [profile, setProfile] = useState(null);
   const [healthData, setHealthData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Simulated Live Sensors
+  const [liveBpm, setLiveBpm] = useState(76);
+  const [calories, setCalories] = useState(2104);
+  const [steps, setSteps] = useState(8542);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => {
+    
+    // Watch Sensor Simulation
+    const liveInterval = setInterval(() => {
+      setLiveBpm(prev => {
+        const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
+        const next = prev + change;
+        if (next < 65) return 65;
+        if (next > 115) return 115;
+        return next;
+      });
+      setCalories(prev => prev + (Math.random() > 0.5 ? 1 : 0));
+      setSteps(prev => prev + Math.floor(Math.random() * 4));
+    }, 2000);
+
+    const dataInterval = setInterval(() => {
       fetchHealthData();
     }, 10000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(liveInterval);
+      clearInterval(dataInterval);
+    };
   }, []);
 
   const fetchData = async () => {
@@ -34,7 +61,12 @@ const HomeScreen = () => {
         setHealthData(response.data[0]);
       }
     } catch (e) {
-      console.error(e);
+      if (e.response?.status === 401) {
+        // If session is expired, kick back to login
+        logout();
+      } else {
+        console.error(e);
+      }
     }
   };
 
@@ -54,7 +86,7 @@ const HomeScreen = () => {
         >
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.greetingText}>Good morning,</Text>
+              <Text style={styles.greetingText}>{t('hello')}</Text>
               <Text style={styles.nameText}>{profile ? profile.username : 'User'} 👋</Text>
             </View>
             <View style={styles.avatarCircle}>
@@ -67,7 +99,7 @@ const HomeScreen = () => {
           {/* Main Heart Rate Card */}
           <View style={styles.mainCard}>
             <View style={styles.mainCardHeader}>
-              <Text style={styles.mainCardTitle}>LIVE HEART RATE</Text>
+              <Text style={styles.mainCardTitle}>{t('monitoring')}</Text>
               <View style={[styles.statusBadge, {backgroundColor: healthData?.status === 'normal' || !healthData ? '#e5f8ed' : '#ffe1e1'}]}>
                 <View style={[styles.statusDot, {backgroundColor: healthData?.status === 'normal' || !healthData ? '#28c46c' : '#ff4b4b'}]} />
                 <Text style={[styles.statusText, {color: healthData?.status === 'normal' || !healthData ? '#28c46c' : '#ff4b4b'}]}>
@@ -77,22 +109,22 @@ const HomeScreen = () => {
             </View>
 
             <View style={styles.bpmContainer}>
-              <Text style={styles.bpmValue}>{healthData ? healthData.heart_rate : '--'}</Text>
-              <Text style={styles.bpmLabel}>bpm</Text>
+              <Text style={styles.bpmValue}>{liveBpm}</Text>
+              <Text style={styles.bpmLabel}>{t('bpm')}</Text>
             </View>
             
             {/* Simulated wave */}
             <View style={styles.waveGraphic}>
-              <Ionicons name="pulse" size={40} color="#3282f6" style={{opacity: 0.6}} />
+              <Ionicons name="pulse" size={40} color={liveBpm > 100 ? "#ff4b4b" : "#3282f6"} style={{opacity: 0.6}} />
             </View>
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, {color: '#3282f6'}]}>72</Text>
+                <Text style={[styles.statValue, {color: '#3282f6'}]}>65</Text>
                 <Text style={styles.statLabel}>Min BPM</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, {color: '#ff4b4b'}]}>112</Text>
+                <Text style={[styles.statValue, {color: '#ff4b4b'}]}>115</Text>
                 <Text style={styles.statLabel}>Max BPM</Text>
               </View>
               <View style={styles.statItem}>
@@ -108,15 +140,15 @@ const HomeScreen = () => {
               <View style={[styles.iconCircle, {backgroundColor: '#fff0f0'}]}>
                 <Ionicons name="flame" size={20} color="#ff6b6b" />
               </View>
-              <Text style={styles.widgetValue}>2100</Text>
-              <Text style={styles.widgetLabel}>Calories</Text>
+              <Text style={styles.widgetValue}>{calories}</Text>
+              <Text style={styles.widgetLabel}>{t('calories')}</Text>
             </View>
             <View style={styles.widgetCard}>
               <View style={[styles.iconCircle, {backgroundColor: '#f1f0ff'}]}>
                 <Ionicons name="footsteps" size={20} color="#845ef7" />
               </View>
-              <Text style={styles.widgetValue}>8500</Text>
-              <Text style={styles.widgetLabel}>Steps</Text>
+              <Text style={styles.widgetValue}>{steps}</Text>
+              <Text style={styles.widgetLabel}>{t('steps')}</Text>
             </View>
             <View style={styles.widgetCard}>
               <View style={[styles.iconCircle, {backgroundColor: '#e6f3ff'}]}>
@@ -141,23 +173,26 @@ const HomeScreen = () => {
           )}
 
           <View style={styles.appointmentsHeader}>
-            <Text style={styles.sectionTitle}>Appointments</Text>
-            <Text style={styles.viewAllText}>View All</Text>
+            <Text style={styles.sectionTitle}>AI Health Prediction</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Dashboard')}>
+              <Text style={styles.viewAllText}>Details</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.appointmentCard}>
-            <View style={styles.apptIconCircle}>
-              <Ionicons name="medical" size={24} color="#3282f6" />
+          <TouchableOpacity 
+             style={[styles.appointmentCard, {backgroundColor: '#e6f0ff', borderColor: '#b3d4ff', borderWidth: 1}]}
+             onPress={() => navigation.navigate('Dashboard')}
+          >
+            <View style={[styles.apptIconCircle, {backgroundColor: '#fff'}]}>
+              <Ionicons name="analytics" size={24} color="#3282f6" />
             </View>
             <View style={styles.apptDetails}>
-              <Text style={styles.docName}>Dr. Sarah</Text>
-              <Text style={styles.docSpec}>Cardiologist</Text>
+              <Text style={styles.docName}>Excellent Trend</Text>
+              <Text style={[styles.docSpec, {marginTop: 2, color: '#444'}]}>
+                Based on your live watch sensors, your heart rhythm is perfectly stable. You are on track to burn 2450 kcals today. Keep up the great work!
+              </Text>
             </View>
-            <View style={styles.apptTimeBlock}>
-              <Text style={styles.apptTime}>10:30 AM</Text>
-              <Text style={styles.apptDay}>Tomorrow</Text>
-            </View>
-          </View>
+          </TouchableOpacity>
 
         </View>
       </ScrollView>
