@@ -16,6 +16,8 @@ import ChatbotScreen from '../screens/ChatbotScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import HelpScreen from '../screens/HelpScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordConfirmScreen from '../screens/ResetPasswordConfirmScreen';
 
 const Stack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
@@ -25,6 +27,8 @@ const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Signup" component={SignupScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="ResetPasswordConfirm" component={ResetPasswordConfirmScreen} />
   </Stack.Navigator>
 );
 

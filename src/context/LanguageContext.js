@@ -30,6 +30,14 @@ const translations = {
     save: "Save",
     done: "Done",
     cancel: "Cancel",
+    edit: "Edit",
+    health_warning: "Health Warning",
+    status_normal: "Normal",
+    status_warning: "Warning",
+    status_critical: "Critical",
+    avg_bpm: "Avg BPM",
+    bpm_now: "bpm now",
+    medical_pulse: "Medical Pulse",
   },
   ar: {
     home: "الرئيسية",
@@ -57,6 +65,14 @@ const translations = {
     save: "حفظ",
     done: "تم",
     cancel: "إلغاء",
+    edit: "تعديل",
+    health_warning: "تحذير صحي",
+    status_normal: "طبيعي",
+    status_warning: "تحذير",
+    status_critical: "حرج",
+    avg_bpm: "متوسط نبضات القلب",
+    bpm_now: "نبضة/دقيقة الآن",
+    medical_pulse: "النبض الطبي",
   }
 };
 

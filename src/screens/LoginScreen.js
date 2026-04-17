@@ -8,22 +8,20 @@ import * as WebBrowser from 'expo-web-browser';
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loadingApp, setLoadingApp] = useState(''); // 'google', 'apple', or ''
+  const [loadingApp, setLoadingApp] = useState(''); // 'google', 'apple'
   const { login, register } = useContext(AuthContext);
 
   const handleSocialLogin = async (platform) => {
     setLoadingApp(platform);
-    
+
     if (platform === 'google') {
       try {
-        // This opens the REAL Google sign-in page so you can select your account securely!
         await WebBrowser.openBrowserAsync('https://accounts.google.com/ServiceLogin');
       } catch (error) {
         console.log(error);
       }
     } else if (platform === 'apple') {
       try {
-        // Opens the Apple ID login page
         await WebBrowser.openBrowserAsync('https://appleid.apple.com/sign-in');
       } catch (error) {
         console.log(error);
@@ -62,7 +60,7 @@ const LoginScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
-        
+
         {/* Curved Header */}
         <LinearGradient
           colors={['#4ba1ff', '#2d7df6']}
@@ -70,9 +68,9 @@ const LoginScreen = ({ navigation }) => {
         >
           <View style={styles.logoContainer}>
             <Ionicons name="pulse" size={32} color="#fff" />
-            <Text style={styles.logoText}>PulseGuard</Text>
+            <Text style={styles.logoText}>CardioGo</Text>
           </View>
-          
+
           <Text style={styles.headerTitle}>Your Heart,{'\n'}Our Priority.</Text>
           <Text style={styles.headerSub}>Smart monitoring that keeps you safe, 24/7</Text>
         </LinearGradient>
@@ -105,7 +103,7 @@ const LoginScreen = ({ navigation }) => {
             />
           </View>
 
-          <TouchableOpacity style={styles.forgotBtn}>
+          <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 
@@ -127,7 +125,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('google')} disabled={loadingApp !== ''}>
               {loadingApp === 'google' ? (
-                 <ActivityIndicator size="small" color="#DB4437" />
+                <ActivityIndicator size="small" color="#DB4437" />
               ) : (
                 <>
                   <Ionicons name="logo-google" size={20} color="#DB4437" />
@@ -137,7 +135,7 @@ const LoginScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('apple')} disabled={loadingApp !== ''}>
               {loadingApp === 'apple' ? (
-                 <ActivityIndicator size="small" color="#000" />
+                <ActivityIndicator size="small" color="#000" />
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={20} color="#000" />

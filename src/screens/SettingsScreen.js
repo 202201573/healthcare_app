@@ -1,9 +1,12 @@
-import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import React, { useContext, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { LanguageContext } from '../context/LanguageContext';
+import { HardwareService } from '../services/HardwareService';
+import api from '../services/api';
 
 const SettingsScreen = ({ navigation }) => {
   const { logout } = useContext(AuthContext);
@@ -17,17 +20,118 @@ const SettingsScreen = ({ navigation }) => {
   const [notiModalVisible, setNotiModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
+  const [nameModalVisible, setNameModalVisible] = useState(false);
+  
+  // Profile state
+  const [profile, setProfile] = useState(null);
+  const [editedName, setEditedName] = useState('');
   
   // Specific settings states
   const [pushEnabled, setPushEnabled] = useState(true);
   const [reportEnabled, setReportEnabled] = useState(true);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await api.get('user/profile/');
+      setProfile(response.data);
+      setEditedName(response.data.username);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const push = await AsyncStorage.getItem('push_enabled');
+      const report = await AsyncStorage.getItem('report_enabled');
+      const alerts = await AsyncStorage.getItem('heart_alerts_enabled');
+      
+      if (push !== null) setPushEnabled(JSON.parse(push));
+      if (report !== null) setReportEnabled(JSON.parse(report));
+      if (alerts !== null) setAlertsEnabled(JSON.parse(alerts));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateName = async () => {
+    if (!editedName.trim()) return;
+    try {
+      const response = await api.patch('user/profile/', { username: editedName });
+      setProfile(response.data);
+      setNameModalVisible(false);
+      Alert.alert("Success", "Profile name updated!");
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not update name.");
+    }
+  };
+  const handleAlertsToggle = async (value) => {
+    setAlertsEnabled(value);
+    await AsyncStorage.setItem('heart_alerts_enabled', JSON.stringify(value));
+    if (value) {
+      const granted = await HardwareService.requestNotificationPermissions();
+      if (!granted) {
+        setAlertsEnabled(false);
+        await AsyncStorage.setItem('heart_alerts_enabled', JSON.stringify(false));
+      }
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to exit?", [
       { text: "Cancel", style: "cancel" },
       { text: "Sign Out", style: "destructive", onPress: logout }
     ]);
+  };
+
+  const handlePushToggle = async (value) => {
+    setPushEnabled(value);
+    await AsyncStorage.setItem('push_enabled', JSON.stringify(value));
+    if (value) {
+      const granted = await HardwareService.requestNotificationPermissions();
+      if (granted) {
+        await HardwareService.sendImmediateTestNotification();
+      } else {
+        setPushEnabled(false);
+        await AsyncStorage.setItem('push_enabled', JSON.stringify(false));
+      }
+    }
+  };
+
+  const handleReportToggle = async (value) => {
+    setReportEnabled(value);
+    await AsyncStorage.setItem('report_enabled', JSON.stringify(value));
+    if (value) {
+      const granted = await HardwareService.requestNotificationPermissions();
+      if (granted) {
+        await HardwareService.scheduleDailyReport();
+      } else {
+        setReportEnabled(false);
+        await AsyncStorage.setItem('report_enabled', JSON.stringify(false));
+      }
+    } else {
+      await HardwareService.cancelAllNotifications();
+      Alert.alert("Notifications", "Daily reports have been disabled.");
+    }
+  };
+
+
+  const handleClearChat = async () => {
+    try {
+      // 1. Clear Backend Chat History
+      await api.delete('chat/clear/');
+      
+      Alert.alert("Success", "All chat history has been permanently deleted.");
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not clear data. Please try again.");
+    }
   };
 
   const renderToggle = (icon, title, sub, iconColor, bg, value, onValueChange) => (
@@ -85,17 +189,17 @@ const SettingsScreen = ({ navigation }) => {
             <Ionicons name="person" size={24} color="#3282f6" />
           </View>
           <View style={styles.premiumInfo}>
-            <Text style={styles.premiumName}>User Account</Text>
-            <Text style={styles.premiumSub}>Premium Plan ✦</Text>
+            <Text style={styles.premiumName}>{profile ? profile.username : 'User Account'}</Text>
+            <Text style={styles.premiumSub}>{profile ? profile.email : 'Premium Plan ✦'}</Text>
           </View>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => setNameModalVisible(true)}>
              <Ionicons name="pencil" size={16} color="#3282f6" />
           </TouchableOpacity>
         </LinearGradient>
 
         <Text style={styles.sectionHeader}>{t('monitoring')}</Text>
         <View style={styles.cardBlock}>
-          {renderToggle('heart', 'Heart Rate Alerts', 'Notify when abnormal', '#ff4b4b', '#ffebeb', alertsEnabled, setAlertsEnabled)}
+          {renderToggle('heart', 'Heart Rate Alerts', 'Notify when abnormal', '#ff4b4b', '#ffebeb', alertsEnabled, handleAlertsToggle)}
           <View style={styles.divider} />
           {renderToggle('sync', 'Live Sync', 'Connect hardware device', '#3282f6', '#e6f0ff', liveSyncEnabled, setLiveSyncEnabled)}
           <View style={styles.divider} />
@@ -117,6 +221,30 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* --- MODALS --- */}
 
+        {/* Name Edit Modal */}
+        <Modal visible={nameModalVisible} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Profile Name</Text>
+                <TouchableOpacity onPress={() => setNameModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              <TextInput 
+                style={styles.nameInput}
+                value={editedName}
+                onChangeText={setEditedName}
+                placeholder="Enter your name"
+                autoFocus
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleUpdateName}>
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Notifications Modal */}
         <Modal visible={notiModalVisible} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
@@ -127,9 +255,7 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              {renderToggle('notifications', 'Push Notifications', 'Real-time health alerts', '#3282f6', '#e6f0ff', pushEnabled, setPushEnabled)}
-              <View style={styles.divider} />
-              {renderToggle('document-text', 'Daily Health Reports', 'Evening health summary', '#28c46c', '#ebfbee', reportEnabled, setReportEnabled)}
+              {renderToggle('notifications', 'Push Notifications', 'Real-time health alerts', '#3282f6', '#e6f0ff', pushEnabled, handlePushToggle)}
               <TouchableOpacity style={styles.saveBtn} onPress={() => setNotiModalVisible(false)}>
                 <Text style={styles.saveBtnText}>{t('done')}</Text>
               </TouchableOpacity>
@@ -147,7 +273,7 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              {['English', 'العربية (Arabic)', 'Français (French)', 'Español (Spanish)'].map((lang, idx) => (
+                {['English', 'العربية (Arabic)'].map((lang, idx) => (
                 <TouchableOpacity 
                   key={idx} 
                   style={styles.langItem} 
@@ -175,12 +301,10 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              {renderToggle('finger-print', 'Biometric Lock', 'Use FaceID/Fingerprint', '#845ef7', '#f1f0ff', biometricEnabled, setBiometricEnabled)}
-              <View style={styles.divider} />
               {renderLink('trash-outline', 'Clear Chat History', 'Delete all AI records', '#ff4b4b', '#fff0f0', () => {
                 Alert.alert("Confirm", "Delete all chat history permanently?", [
                   { text: 'Cancel' },
-                  { text: 'Delete', style: 'destructive' }
+                  { text: 'Delete', style: 'destructive', onPress: handleClearChat }
                 ])
               })}
               <TouchableOpacity style={styles.saveBtn} onPress={() => setPrivacyModalVisible(false)}>
@@ -362,6 +486,16 @@ const styles = StyleSheet.create({
   langActive: {
     color: '#3282f6',
     fontWeight: 'bold'
+  },
+  nameInput: {
+    backgroundColor: '#f5f7fa',
+    borderRadius: 12,
+    padding: 15,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e6e6e6',
+    marginTop: 10
   }
 });
 

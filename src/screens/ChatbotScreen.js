@@ -1,5 +1,9 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Animated } from 'react-native';
+import React, { useState, useEffect, useRef, useContext, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Animated, Image, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
@@ -12,12 +16,17 @@ const ChatbotScreen = ({ navigation }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
-  
+  const [isRecording, setIsRecording] = useState(false);
+
+  const recordingRef = useRef(null);
+  const isStartingRef = useRef(false);
   const flatListRef = useRef(null);
 
-  useEffect(() => {
-    fetchMessages();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages();
+    }, [])
+  );
 
   const fetchMessages = async () => {
     try {
@@ -28,18 +37,112 @@ const ChatbotScreen = ({ navigation }) => {
     }
   };
 
-  const sendMessage = async (textOverride = null) => {
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Sorry, we need camera roll permissions to make this work!');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const selectedImage = result.assets[0];
+      sendMessage(null, selectedImage);
+    }
+  };
+
+  const startRecording = async () => {
+    if (isStartingRef.current || isRecording) return;
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') return;
+
+      isStartingRef.current = true;
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = recording;
+      setIsRecording(true);
+      isStartingRef.current = false;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      isStartingRef.current = false;
+    }
+  };
+
+  const stopRecording = async () => {
+    if (isStartingRef.current) {
+      setTimeout(stopRecording, 100);
+      return;
+    }
+
+    if (!recordingRef.current) return;
+
+    setIsRecording(false);
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      sendMessage(null, null, { uri });
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+      recordingRef.current = null;
+    }
+  };
+
+  const sendMessage = async (textOverride = null, imageFile = null, audioFile = null) => {
     const textToSend = textOverride || inputText;
-    if (!textToSend.trim()) return;
+    if (!textToSend.trim() && !imageFile && !audioFile) return;
 
     try {
-      const userMsg = { message: textToSend };
-      
+      const formData = new FormData();
+      if (textToSend) formData.append('message', textToSend);
+
+      if (imageFile) {
+        const filename = imageFile.uri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image`;
+        formData.append('image', { uri: imageFile.uri, name: filename, type });
+      }
+
+      if (audioFile) {
+        formData.append('audio', {
+          uri: audioFile.uri,
+          name: 'recording.m4a',
+          type: 'audio/m4a',
+        });
+      }
+
       const tempId = Date.now().toString();
-      setMessages(prev => [...prev, { id: tempId, sender: 'user', message: textToSend }]);
+      const localMsg = {
+        id: tempId,
+        sender: 'user',
+        message: audioFile ? "🎤 Voice Message" : textToSend,
+        image: imageFile ? imageFile.uri : null,
+        audio: audioFile ? audioFile.uri : null
+      };
+
+      setMessages(prev => [...prev, localMsg]);
       if (!textOverride) setInputText('');
 
-      await api.post('chat/', userMsg);
+      await api.post('chat/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       fetchMessages();
     } catch (e) {
       console.error(e);
@@ -55,15 +158,22 @@ const ChatbotScreen = ({ navigation }) => {
       )}
       <View style={[styles.messageBlock, item.sender === 'user' ? styles.userBlock : styles.aiBlock]}>
         {item.sender === 'ai' && item.message.includes('86') ? (
-            <View style={styles.vitalSnippet}>
-              <Ionicons name="heart" size={16} color="#ff4b4b" />
-              <Text style={styles.vitalSnippetVal}> 86 bpm </Text>
-              <Text style={styles.vitalSnippetLabel}>- Normal</Text>
-            </View>
-        ): null}
+          <View style={styles.vitalSnippet}>
+            <Ionicons name="heart" size={16} color="#ff4b4b" />
+            <Text style={styles.vitalSnippetVal}> 86 bpm </Text>
+            <Text style={styles.vitalSnippetLabel}>- Normal</Text>
+          </View>
+        ) : null}
         <Text style={[styles.messageText, item.sender === 'user' ? styles.userText : styles.aiText]}>{item.message}</Text>
-        <Text style={[styles.timeText, item.sender === 'user' ? {color: 'rgba(255,255,255,0.7)'} : null]}>
-            {new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {item.image && (
+          <Image
+            source={{ uri: item.image.startsWith('http') ? item.image : (item.image.startsWith('file') ? item.image : `http://10.0.2.2:8001${item.image}`) }}
+            style={styles.messageImage}
+            resizeMode="cover"
+          />
+        )}
+        <Text style={[styles.timeText, item.sender === 'user' ? { color: 'rgba(255,255,255,0.7)' } : null]}>
+          {new Date(item.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
       </View>
       {item.sender === 'user' && (
@@ -74,113 +184,121 @@ const ChatbotScreen = ({ navigation }) => {
     </View>
   );
 
-  const filteredMessages = messages.filter(msg => 
-    msg.message.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMessages = messages.filter(msg =>
+    (msg.message || '').toLowerCase().includes((searchQuery || '').toLowerCase())
   );
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#4ba1ff', '#2d7df6']} style={styles.header}>
         {isSearching ? (
-            <View style={styles.searchHeaderInner}>
-                <TouchableOpacity onPress={() => {setIsSearching(false); setSearchQuery('');}}>
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
-                </TouchableOpacity>
-                <TextInput 
-                    style={styles.headerSearchInput}
-                    placeholder="Search messages..."
-                    placeholderTextColor="rgba(255,255,255,0.7)"
-                    autoFocus
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
+          <View style={styles.searchHeaderInner}>
+            <TouchableOpacity onPress={() => { setIsSearching(false); setSearchQuery(''); }}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.headerSearchInput}
+              placeholder="Search messages..."
+              placeholderTextColor="rgba(255,255,255,0.7)"
+              autoFocus
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
         ) : (
-            <>
-                <View style={styles.headerIconGrp}>
-                <View style={styles.headerAiAvatar}><Ionicons name="happy" size={24} color="#ff4b4b" /></View>
-                <View style={{marginLeft: 15}}>
-                    <Text style={styles.headerTitle}>PulseGuard AI</Text>
-                    <Text style={styles.headerStatus}>• Online & Monitoring</Text>
-                </View>
-                </View>
-                <View style={styles.headerActions}>
-                <TouchableOpacity onPress={() => setIsSearching(true)}>
-                    <Ionicons name="search" size={24} color="#fff" style={{marginRight: 15}} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setMenuVisible(true)}>
-                    <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
-                </TouchableOpacity>
-                </View>
-            </>
+          <>
+            <View style={styles.headerIconGrp}>
+              <View style={styles.headerAiAvatar}><Ionicons name="happy" size={24} color="#ff4b4b" /></View>
+              <View style={{ marginLeft: 15 }}>
+                <Text style={styles.headerTitle}>CardioGo AI</Text>
+                <Text style={styles.headerStatus}>• Online & Monitoring</Text>
+              </View>
+            </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => setIsSearching(true)}>
+                <Ionicons name="search" size={24} color="#fff" style={{ marginRight: 15 }} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setMenuVisible(true)}>
+                <Ionicons name="ellipsis-vertical" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </>
         )}
       </LinearGradient>
 
       {/* Menu Modal */}
       <Modal visible={menuVisible} transparent animationType="fade">
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
-              <View style={styles.menuBox}>
-                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Home');}}>
-                      <Ionicons name="home-outline" size={20} color="#333" />
-                      <Text style={styles.menuItemText}>{t('home')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Dashboard');}}>
-                      <Ionicons name="stats-chart-outline" size={20} color="#333" />
-                      <Text style={styles.menuItemText}>{t('dashboard')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuItem} onPress={() => {setMenuVisible(false); navigation.navigate('Profile');}}>
-                      <Ionicons name="person-outline" size={20} color="#333" />
-                      <Text style={styles.menuItemText}>{t('profile')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                      <Ionicons name="settings-outline" size={20} color="#333" />
-                      <Text style={styles.menuItemText}>{t('settings')}</Text>
-                  </TouchableOpacity>
-              </View>
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+          <View style={styles.menuBox}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Home'); }}>
+              <Ionicons name="home-outline" size={20} color="#333" />
+              <Text style={styles.menuItemText}>{t('home')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Dashboard'); }}>
+              <Ionicons name="stats-chart-outline" size={20} color="#333" />
+              <Text style={styles.menuItemText}>{t('dashboard')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Profile'); }}>
+              <Ionicons name="person-outline" size={20} color="#333" />
+              <Text style={styles.menuItemText}>{t('profile')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
+              <Ionicons name="settings-outline" size={20} color="#333" />
+              <Text style={styles.menuItemText}>{t('settings')}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       <KeyboardAvoidingView style={styles.contentWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           ref={flatListRef}
-          data={searchQuery ? filteredMessages : (messages.length > 0 ? messages : [{id: '1', sender: 'ai', message: "Hello! I've analyzed your vitals. Your heart rate looks normal today - 86 bpm. Anything specific you'd like to know?"}])}
+          data={searchQuery ? filteredMessages : (messages.length > 0 ? messages : [{ id: '1', sender: 'ai', message: "Hello! I've analyzed your vitals. Your heart rate looks normal today - 86 bpm. Anything specific you'd like to know?" }])}
           keyExtractor={item => item.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.chatList}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => !searchQuery && flatListRef.current?.scrollToEnd({animated: true})}
-          onLayout={() => !searchQuery && flatListRef.current?.scrollToEnd({animated: true})}
+          onContentSizeChange={() => !searchQuery && flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => !searchQuery && flatListRef.current?.scrollToEnd({ animated: true })}
         />
 
         <View style={styles.bottomArea}>
-           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promptsRow}>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Generate a 7-day health schedule for me")}>
-               <Text style={styles.promptText}>🗓️ 7-Day Schedule</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("What are the risks of heart disease?")}>
-               <Text style={styles.promptText}>🫀 Risk Analysis</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Explain my latest health data")}>
-               <Text style={styles.promptText}>💡 Data Insight</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Give me 5 sleep tips")}>
-               <Text style={styles.promptText}>🌙 Sleep Tips</Text>
-             </TouchableOpacity>
-           </ScrollView>
-           
-           <View style={styles.inputRow}>
-             <TouchableOpacity style={styles.iconBtn}><Ionicons name="add" size={24} color="#bdc3c7" /></TouchableOpacity>
-             <TextInput
-               style={styles.inputBox}
-               placeholder="Type your message..."
-               value={inputText}
-               onChangeText={setInputText}
-             />
-             <TouchableOpacity style={styles.iconBtn}><Ionicons name="mic-outline" size={24} color="#bdc3c7" /></TouchableOpacity>
-             <TouchableOpacity style={styles.sendBtn} onPress={() => sendMessage(null)}>
-               <Ionicons name="send" size={20} color="#fff" style={{marginLeft: 3, marginTop: 2}} />
-             </TouchableOpacity>
-           </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promptsRow}>
+            <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Generate a 7-day health schedule for me")}>
+              <Text style={styles.promptText}>🗓️ 7-Day Schedule</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("What are the risks of heart disease?")}>
+              <Text style={styles.promptText}>🫀 Risk Analysis</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Explain my latest health data")}>
+              <Text style={styles.promptText}>💡 Data Insight</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.promptBtn} onPress={() => sendMessage("Give me 5 sleep tips")}>
+              <Text style={styles.promptText}>🌙 Sleep Tips</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.iconBtn} onPress={pickImage}>
+              <Ionicons name="add" size={24} color="#3282f6" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.inputBox}
+              placeholder="Type your message..."
+              value={inputText}
+              onChangeText={setInputText}
+            />
+            <TouchableOpacity
+              style={[styles.iconBtn, isRecording && styles.micActive]}
+              onPressIn={startRecording}
+              onPressOut={stopRecording}
+            >
+              <Ionicons name={isRecording ? "mic" : "mic"} size={26} color={isRecording ? "#ff4b4b" : "#3282f6"} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sendBtn} onPress={() => sendMessage(null)}>
+              <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 3, marginTop: 2 }} />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -423,6 +541,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 3
+  },
+  messageImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 15,
+    marginTop: 10,
+    backgroundColor: '#eee'
+  },
+  micActive: {
+    backgroundColor: '#fff0f0',
+    borderRadius: 20,
+    transform: [{ scale: 1.2 }]
   }
 });
 

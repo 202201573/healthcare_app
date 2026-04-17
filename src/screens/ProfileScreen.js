@@ -12,13 +12,11 @@ const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
   const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(false);
-  
-  // Modals
+
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [recordsModalVisible, setRecordsModalVisible] = useState(false);
 
-  // Form State
   const [editAge, setEditAge] = useState('');
   const [editGender, setEditGender] = useState('');
 
@@ -74,7 +72,7 @@ const ProfileScreen = ({ navigation }) => {
 
   const renderMenuItem = (icon, title, sub, iconColor, bg, onPress) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <View style={[styles.menuIconWrap, {backgroundColor: bg}]}>
+      <View style={[styles.menuIconWrap, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
       <View style={styles.menuTextWrap}>
@@ -88,17 +86,17 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         {/* Curved Header & Profile Card */}
         <LinearGradient
           colors={['#4ba1ff', '#2d7df6']}
           style={styles.headerArea}
         >
           <View style={styles.headerTop}>
-             <Text style={styles.headerTitle}></Text>
-             <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-                <Ionicons name="settings-outline" size={24} color="#fff" />
-             </TouchableOpacity>
+            <Text style={styles.headerTitle}></Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+              <Ionicons name="settings-outline" size={24} color="#fff" />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.avatarContainer}>
@@ -116,7 +114,7 @@ const ProfileScreen = ({ navigation }) => {
         </LinearGradient>
 
         <View style={styles.contentArea}>
-          
+
           <View style={styles.statsCard}>
             <View style={styles.statBox}>
               <Text style={styles.statVal}>{healthData ? healthData.heart_rate : '86'}</Text>
@@ -129,29 +127,29 @@ const ProfileScreen = ({ navigation }) => {
             </View>
             <View style={styles.divider} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, {color: isHealthy ? '#222' : '#ff4b4b'}]}>{isHealthy ? 'Low' : 'High'}</Text>
+              <Text style={[styles.statVal, { color: isHealthy ? '#222' : '#ff4b4b' }]}>{isHealthy ? t('status_normal') : t('status_critical')}</Text>
               <Text style={styles.statLabel}>{t('risk_level')}</Text>
             </View>
           </View>
 
-          <View style={[styles.healthyBanner, {backgroundColor: isHealthy ? '#eafcf0' : '#ffebeb', borderColor: isHealthy ? '#c3f5d5' : '#ffcaca'}]}>
-             <View style={[styles.statusIcon, {backgroundColor: isHealthy ? '#28c46c' : '#ff4b4b'}]}>
-               <Ionicons name={isHealthy ? "checkmark" : "warning"} size={20} color="#fff" />
-             </View>
-             <View>
-               <Text style={[styles.healthyTitle, {color: isHealthy ? '#1b8a47' : '#d12e2e'}]}>
-                 {isHealthy ? 'All Vitals Healthy' : 'Elevated Vitals'}
-               </Text>
-               <Text style={[styles.healthySub, {color: isHealthy ? '#28c46c' : '#ff4b4b'}]}>Last check: Today 9:41 AM</Text>
-             </View>
+          <View style={[styles.healthyBanner, { backgroundColor: isHealthy ? '#eafcf0' : '#ffebeb', borderColor: isHealthy ? '#c3f5d5' : '#ffcaca' }]}>
+            <View style={[styles.statusIcon, { backgroundColor: isHealthy ? '#28c46c' : '#ff4b4b' }]}>
+              <Ionicons name={isHealthy ? "checkmark" : "warning"} size={20} color="#fff" />
+            </View>
+            <View>
+              <Text style={[styles.healthyTitle, { color: isHealthy ? '#1b8a47' : '#d12e2e' }]}>
+                {isHealthy ? t('status_normal') : t('status_critical')}
+              </Text>
+              <Text style={[styles.healthySub, { color: isHealthy ? '#28c46c' : '#ff4b4b' }]}>Last check: Today 9:41 AM</Text>
+            </View>
           </View>
 
           <View style={styles.menuContainer}>
-             {renderMenuItem('person-circle', t('personal_info'), 'Age, gender, and metrics', '#3282f6', '#e6f0ff', () => setEditModalVisible(true))}
-             {renderMenuItem('heart', t('heart_history'), 'All recorded readings', '#ff4b4b', '#ffebeb', () => navigation.navigate('Dashboard'))}
-             {renderMenuItem('document-text', t('medical_records'), 'Upload & manage documents', '#f5a623', '#fef3c7', () => setRecordsModalVisible(true))}
-             {renderMenuItem('people', t('emergency_contacts'), 'Manage trusted numbers', '#28c46c', '#ebfbee', () => setContactModalVisible(true))}
-             {renderMenuItem('log-out-outline', t('logout'), 'Sign out of your account', '#888', '#f8f9fa', handleLogout)}
+            {renderMenuItem('person-circle', t('personal_info'), 'Age, gender, and metrics', '#3282f6', '#e6f0ff', () => setEditModalVisible(true))}
+            {renderMenuItem('heart', t('heart_history'), 'All recorded readings', '#ff4b4b', '#ffebeb', () => navigation.navigate('Dashboard'))}
+            {renderMenuItem('document-text', t('medical_records'), 'Upload & manage documents', '#f5a623', '#fef3c7', () => setRecordsModalVisible(true))}
+            {renderMenuItem('people', t('emergency_contacts'), 'Manage trusted numbers', '#28c46c', '#ebfbee', () => setContactModalVisible(true))}
+            {renderMenuItem('log-out-outline', t('logout'), 'Sign out of your account', '#888', '#f8f9fa', handleLogout)}
           </View>
 
           {/* Edit Profile Modal */}
@@ -164,21 +162,21 @@ const ProfileScreen = ({ navigation }) => {
                     <Ionicons name="close" size={24} color="#333" />
                   </TouchableOpacity>
                 </View>
-                
+
                 <Text style={styles.inputLabel}>Age</Text>
-                <TextInput 
-                  style={styles.modalInput} 
-                  value={editAge} 
-                  onChangeText={setEditAge} 
-                  placeholder="Enter age" 
+                <TextInput
+                  style={styles.modalInput}
+                  value={editAge}
+                  onChangeText={setEditAge}
+                  placeholder="Enter age"
                   keyboardType="numeric"
                 />
 
                 <Text style={styles.inputLabel}>Gender</Text>
                 <View style={styles.genderRow}>
                   {['Male', 'Female', 'Other'].map(g => (
-                    <TouchableOpacity 
-                      key={g} 
+                    <TouchableOpacity
+                      key={g}
                       style={[styles.genderBtn, editGender === g ? styles.genderBtnActive : null]}
                       onPress={() => setEditGender(g)}
                     >
@@ -204,7 +202,7 @@ const ProfileScreen = ({ navigation }) => {
                     <Ionicons name="close" size={24} color="#333" />
                   </TouchableOpacity>
                 </View>
-                
+
                 {[
                   { name: 'Dr. Sarah (Heart Specialist)', phone: '+1 234 567 890' },
                   { name: 'John Doe (Brother)', phone: '+1 987 654 321' },
@@ -238,10 +236,10 @@ const ProfileScreen = ({ navigation }) => {
                     <Ionicons name="close" size={24} color="#333" />
                   </TouchableOpacity>
                 </View>
-                
+
                 <View style={styles.emptyRecords}>
-                   <Ionicons name="cloud-upload-outline" size={50} color="#ccc" />
-                   <Text style={styles.emptyText}>No documents uploaded yet.</Text>
+                  <Ionicons name="cloud-upload-outline" size={50} color="#ccc" />
+                  <Text style={styles.emptyText}>No documents uploaded yet.</Text>
                 </View>
 
                 <TouchableOpacity style={styles.saveBtn} onPress={() => setRecordsModalVisible(false)}>
