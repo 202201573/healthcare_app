@@ -2,41 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import api from '../services/api';
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Notification permissions not granted!');
-      }
-    })();
+    // Basic init if needed
   }, []);
 
   const showCodeNotification = async (code) => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "🔐 CardioGo Reset Code",
-        body: `Your verification code is: ${code}. Do not share this with anyone.`,
-        data: { data: 'reset' },
-      },
-      trigger: null,
-    });
+    // Fallback for Expo Go compatibility instead of crashing Native Core
+    Alert.alert("📱 SYSTEM NOTIFICATION", `Your CardioGo verification code is: ${code}. Do not share this with anyone!`);
   };
 
   const handleRequestOTP = async () => {

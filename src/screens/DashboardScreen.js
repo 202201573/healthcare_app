@@ -41,6 +41,7 @@ const DashboardScreen = () => {
       setAllHistory(response.data);
       if (response.data.length > 0) {
         setHealthData(response.data[0]);
+      }
     } catch (e) {
       console.error(e);
     }

@@ -1,23 +1,6 @@
 import { Alert } from 'react-native';
 
-let Notifications = null;
-
-try {
-  Notifications = require('expo-notifications');
-
-  if (Notifications) {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
-  }
-} catch (e) {
-  console.log("Hardware modules not available in this environment.");
-}
+const Notifications = null;
 
 
 export const HardwareService = {
