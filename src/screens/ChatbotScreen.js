@@ -32,7 +32,7 @@ const ChatbotScreen = ({ navigation }) => {
     }]);
   };
 
-  const GEMINI_API_KEY = "AIzaSyAV4MqoKAkkEbYyDN8zkeFDyiMrPxIsZaQ";
+  const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
   const fetchGeminiResponse = async (input) => {
     try {
