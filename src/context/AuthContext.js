@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import api, { setLogoutHandler } from '../services/api';
 
 export const AuthContext = createContext();
 
@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     isLoggedIn();
+    setLogoutHandler(logout);
   }, []);
 
   return (
