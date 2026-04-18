@@ -55,7 +55,7 @@ const LoginScreen = ({ navigation }) => {
       }
       await login(username, password);
     } catch (e) {
-      Alert.alert('Login Failed', 'Invalid credentials or server error.');
+      Alert.alert('Login Failed', e.message || 'Invalid credentials or server error.');
     }
   };
 

@@ -1,53 +1,47 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Image, TouchableOpacity, Modal } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import RiskPredictor from '../ml/RiskPredictor';
 import { AuthContext } from '../context/AuthContext';
+import { SensorContext } from '../context/SensorContext';
 import { LanguageContext } from '../context/LanguageContext';
 
 const HomeScreen = ({ navigation }) => {
   const { logout } = useContext(AuthContext);
   const { t } = useContext(LanguageContext);
+  const { liveBpm, liveSpo2, calories, steps } = useContext(SensorContext);
   const [profile, setProfile] = useState(null);
   const [healthData, setHealthData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Simulated Live Sensors
-  const [liveBpm, setLiveBpm] = useState(76);
-  const [calories, setCalories] = useState(2104);
-  const [steps, setSteps] = useState(8542);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-    
-    // Watch Sensor Simulation
-    const liveInterval = setInterval(() => {
-      setLiveBpm(prev => {
-        const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
-        const next = prev + change;
-        if (next < 65) return 65;
-        if (next > 115) return 115;
-        return next;
-      });
-      setCalories(prev => prev + (Math.random() > 0.5 ? 1 : 0));
-      setSteps(prev => prev + Math.floor(Math.random() * 4));
-    }, 2000);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
 
-    const dataInterval = setInterval(() => {
-      fetchHealthData();
-    }, 10000);
-    
-    return () => {
-      clearInterval(liveInterval);
-      clearInterval(dataInterval);
-    };
-  }, []);
+      const dataInterval = setInterval(() => {
+        fetchHealthData();
+      }, 10000);
+
+      return () => {
+        clearInterval(dataInterval);
+      };
+    }, [])
+  );
 
   const fetchData = async () => {
     try {
-      const profileRes = await api.get('user/profile/');
-      setProfile(profileRes.data);
+      const currentUsername = await AsyncStorage.getItem('current_username');
+      const usersStr = await AsyncStorage.getItem('app_users_db');
+      const users = usersStr ? JSON.parse(usersStr) : [];
+      let currentUser = users.find(u => u.username === currentUsername);
+      if (currentUser) {
+         setProfile(currentUser);
+      }
       fetchHealthData();
     } catch (e) {
       console.error(e);
@@ -76,6 +70,24 @@ const HomeScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const mlPrediction = RiskPredictor.predict(liveBpm, liveSpo2);
+  let aiCardColor = '#e6f0ff';
+  let aiCardBorder = '#b3d4ff';
+  let aiIconColor = '#3282f6';
+  let aiMessage = "Based on your live watch sensors, your heart rhythm and oxygen levels are perfectly stable. Keep up the great work!";
+
+  if (mlPrediction.riskLevel === 1) {
+     aiCardColor = '#fff9db';
+     aiCardBorder = '#fcc419';
+     aiIconColor = '#f59f00';
+     aiMessage = "Your live sensors are detecting some slight deviations from normal. Please monitor your stress levels today.";
+  } else if (mlPrediction.riskLevel === 2) {
+     aiCardColor = '#ffebeb';
+     aiCardBorder = '#ff8787';
+     aiIconColor = '#ff4b4b';
+     aiMessage = "CRITICAL: Live sensors have detected significant vitals instability. Please rest immediately and consider contacting a doctor if this persists.";
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
@@ -87,11 +99,15 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greetingText}>{t('hello')}</Text>
-              <Text style={styles.nameText}>{profile ? profile.username : 'User'} 👋</Text>
+              <Text style={styles.nameText}>{profile?.displayName || profile?.username || 'User'} 👋</Text>
             </View>
-            <View style={styles.avatarCircle}>
-              <Ionicons name="person" size={24} color="#3282f6" />
-            </View>
+            <TouchableOpacity style={styles.avatarCircle} onPress={() => profile?.avatarUri && setImageViewerVisible(true)}>
+              {profile?.avatarUri ? (
+                <Image source={{uri: profile.avatarUri}} style={{width: 50, height: 50, borderRadius: 25}} />
+              ) : (
+                <Ionicons name="person" size={24} color="#3282f6" />
+              )}
+            </TouchableOpacity>
           </View>
         </LinearGradient>
 
@@ -180,21 +196,34 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           <TouchableOpacity 
-             style={[styles.appointmentCard, {backgroundColor: '#e6f0ff', borderColor: '#b3d4ff', borderWidth: 1}]}
+             style={[styles.appointmentCard, {backgroundColor: aiCardColor, borderColor: aiCardBorder, borderWidth: 1}]}
              onPress={() => navigation.navigate('Dashboard')}
           >
             <View style={[styles.apptIconCircle, {backgroundColor: '#fff'}]}>
-              <Ionicons name="analytics" size={24} color="#3282f6" />
+              <Ionicons name="analytics" size={24} color={aiIconColor} />
             </View>
             <View style={styles.apptDetails}>
-              <Text style={styles.docName}>Excellent Trend</Text>
+              <Text style={styles.docName}>{mlPrediction.riskLabel}</Text>
               <Text style={[styles.docSpec, {marginTop: 2, color: '#444'}]}>
-                Based on your live watch sensors, your heart rhythm is perfectly stable. You are on track to burn 2450 kcals today. Keep up the great work!
+                {aiMessage}
               </Text>
             </View>
           </TouchableOpacity>
 
         </View>
+
+        {/* Fullscreen Image Viewer Modal */}
+        <Modal visible={imageViewerVisible} transparent={true} animationType="fade">
+          <View style={{flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center'}}>
+            <TouchableOpacity style={{position: 'absolute', top: 50, right: 30, zIndex: 1, padding: 10}} onPress={() => setImageViewerVisible(false)}>
+              <Ionicons name="close" size={32} color="#fff" />
+            </TouchableOpacity>
+            {profile?.avatarUri && (
+              <Image source={{uri: profile.avatarUri}} style={{width: '90%', height: '80%', resizeMode: 'contain'}} />
+            )}
+          </View>
+        </Modal>
+
       </ScrollView>
     </View>
   );

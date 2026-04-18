@@ -27,11 +27,7 @@ const SignupScreen = ({ navigation }) => {
 
       await register({ username, email, password, age: parseInt(age) || null, gender: finalGender });
     } catch (e) {
-      if (e.response && e.response.data) {
-        Alert.alert('Registration Failed', JSON.stringify(e.response.data));
-      } else {
-        Alert.alert('Registration Failed', 'Check your information and try again.');
-      }
+      Alert.alert('Registration Failed', e.message || 'Check your information and try again.');
     }
   };
 

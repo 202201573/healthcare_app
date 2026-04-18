@@ -3,10 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Keyboard
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
+import RiskPredictor from '../ml/RiskPredictor';
+import { SensorContext } from '../context/SensorContext';
 import { LanguageContext } from '../context/LanguageContext';
 
 const ChatbotScreen = ({ navigation }) => {
   const { t } = useContext(LanguageContext);
+  const { liveBpm, liveSpo2, liveSys, liveDia, liveTemp } = useContext(SensorContext);
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -20,11 +23,52 @@ const ChatbotScreen = ({ navigation }) => {
   }, []);
 
   const fetchMessages = async () => {
+    // Since there's no backend, load the default greeting instantly
+    setMessages([{
+      id: '1', 
+      sender: 'ai', 
+      message: `Hello! I've been monitoring your active vitals. Your heart rate is currently ${liveBpm} bpm and your SpO2 is ${liveSpo2}%. Anything specific you'd like me to analyze for you?`,
+      timestamp: Date.now()
+    }]);
+  };
+
+  const GEMINI_API_KEY = "AIzaSyAV4MqoKAkkEbYyDN8zkeFDyiMrPxIsZaQ";
+
+  const fetchGeminiResponse = async (input) => {
     try {
-      const response = await api.get('chat/');
-      setMessages(response.data);
-    } catch (e) {
-      console.error(e);
+      const mlPrediction = RiskPredictor.predict(liveBpm, liveSpo2);
+      const systemInstruction = `You are PulseGuard AI, a highly knowledgeable healthcare assistant. 
+IMPORTANT CONTEXT: Below are the user's REAL-TIME physiological vitals actively recorded from their sensors right now:
+- Heart Rate: ${liveBpm} BPM
+- SpO2: ${liveSpo2}%
+- Blood Pressure: ${liveSys}/${liveDia}
+- Body Temp: ${liveTemp} C
+- LOCAL AI RISK ENGINE PREDICTION OVERRIDE: ${mlPrediction.riskLabel}
+
+Use this live organic data to answer ALL questions about their current health status. Provide concise helpful advice under 4 sentences to fit a mobile screen.`;
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: input }] }],
+            systemInstruction: {
+              parts: [{ text: systemInstruction }]
+            }
+          })
+        }
+      );
+      
+      const data = await response.json();
+      if (data && data.candidates && data.candidates.length > 0) {
+        return data.candidates[0].content.parts[0].text;
+      }
+      return "I'm sorry, I couldn't process that request at the moment.";
+    } catch (error) {
+      console.error(error);
+      return "Network error. Please make sure you have internet access to reach the AI servers.";
     }
   };
 
@@ -32,18 +76,19 @@ const ChatbotScreen = ({ navigation }) => {
     const textToSend = textOverride || inputText;
     if (!textToSend.trim()) return;
 
-    try {
-      const userMsg = { message: textToSend };
-      
-      const tempId = Date.now().toString();
-      setMessages(prev => [...prev, { id: tempId, sender: 'user', message: textToSend }]);
-      if (!textOverride) setInputText('');
+    const tempId = Date.now().toString();
+    setMessages(prev => [...prev, { id: tempId, sender: 'user', message: textToSend, timestamp: Date.now() }]);
+    if (!textOverride) setInputText('');
 
-      await api.post('chat/', userMsg);
-      fetchMessages();
-    } catch (e) {
-      console.error(e);
-    }
+    // Fetch intelligent response from Gemini
+    const aiResponse = await fetchGeminiResponse(textToSend);
+    
+    setMessages(prev => [...prev, {
+      id: (Date.now() + 1).toString(),
+      sender: 'ai',
+      message: aiResponse,
+      timestamp: Date.now()
+    }]);
   };
 
   const renderItem = ({ item }) => (

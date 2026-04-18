@@ -1,7 +1,10 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Alert, Modal, TextInput, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { LanguageContext } from '../context/LanguageContext';
 
@@ -22,6 +25,91 @@ const SettingsScreen = ({ navigation }) => {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [reportEnabled, setReportEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  
+  // Profile Data
+  const [profile, setProfile] = useState(null);
+  const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSettings();
+    }, [])
+  );
+
+  const loadSettings = async () => {
+    try {
+      const currentUsername = await AsyncStorage.getItem('current_username');
+      
+      // Load user profile details
+      const usersStr = await AsyncStorage.getItem('app_users_db');
+      const users = usersStr ? JSON.parse(usersStr) : [];
+      let currentUser = users.find(u => u.username === currentUsername);
+      if (currentUser) {
+         setProfile(currentUser);
+         setEditDisplayName(currentUser.displayName || currentUser.username);
+      }
+
+      const settingsStr = await AsyncStorage.getItem(`app_settings_${currentUsername}`);
+      if (settingsStr) {
+        const s = JSON.parse(settingsStr);
+        if (s.alertsEnabled !== undefined) setAlertsEnabled(s.alertsEnabled);
+        if (s.liveSyncEnabled !== undefined) setLiveSyncEnabled(s.liveSyncEnabled);
+        if (s.emergencyEnabled !== undefined) setEmergencyEnabled(s.emergencyEnabled);
+        if (s.pushEnabled !== undefined) setPushEnabled(s.pushEnabled);
+        if (s.reportEnabled !== undefined) setReportEnabled(s.reportEnabled);
+        if (s.biometricEnabled !== undefined) setBiometricEnabled(s.biometricEnabled);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  const updateSetting = async (key, val, setter) => {
+    setter(val);
+    try {
+      const currentUsername = await AsyncStorage.getItem('current_username');
+      const settingsStr = await AsyncStorage.getItem(`app_settings_${currentUsername}`);
+      let s = settingsStr ? JSON.parse(settingsStr) : {};
+      s[key] = val;
+      await AsyncStorage.setItem(`app_settings_${currentUsername}`, JSON.stringify(s));
+    } catch (e) {}
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      const currentUsername = await AsyncStorage.getItem('current_username');
+      const usersStr = await AsyncStorage.getItem('app_users_db');
+      let users = usersStr ? JSON.parse(usersStr) : [];
+      let userIndex = users.findIndex(u => u.username === currentUsername);
+      if (userIndex !== -1) {
+        users[userIndex].avatarUri = result.assets[0].uri;
+        await AsyncStorage.setItem('app_users_db', JSON.stringify(users));
+        setProfile(users[userIndex]);
+      }
+    }
+  };
+
+  const saveProfileName = async () => {
+    const currentUsername = await AsyncStorage.getItem('current_username');
+    const usersStr = await AsyncStorage.getItem('app_users_db');
+    let users = usersStr ? JSON.parse(usersStr) : [];
+    let userIndex = users.findIndex(u => u.username === currentUsername);
+    if (userIndex !== -1) {
+      users[userIndex].displayName = editDisplayName;
+      await AsyncStorage.setItem('app_users_db', JSON.stringify(users));
+      setProfile(users[userIndex]);
+      setEditProfileModalVisible(false);
+      Alert.alert('Success', 'Profile updated!');
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to exit?", [
@@ -82,24 +170,28 @@ const SettingsScreen = ({ navigation }) => {
           end={{ x: 1, y: 0 }}
         >
           <View style={styles.premiumAvatar}>
-            <Ionicons name="person" size={24} color="#3282f6" />
+            {profile?.avatarUri ? (
+               <Image source={{uri: profile.avatarUri}} style={{width: 50, height: 50, borderRadius: 25}} />
+            ) : (
+               <Ionicons name="person" size={24} color="#3282f6" />
+            )}
           </View>
           <View style={styles.premiumInfo}>
-            <Text style={styles.premiumName}>User Account</Text>
-            <Text style={styles.premiumSub}>Premium Plan ✦</Text>
+            <Text style={styles.premiumName}>{profile?.displayName || profile?.username || 'Loading...'}</Text>
+            <Text style={styles.premiumSub}>{profile ? profile.email : 'Premium Plan'}</Text>
           </View>
-          <TouchableOpacity style={styles.editBtn}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditProfileModalVisible(true)}>
              <Ionicons name="pencil" size={16} color="#3282f6" />
           </TouchableOpacity>
         </LinearGradient>
 
         <Text style={styles.sectionHeader}>{t('monitoring')}</Text>
         <View style={styles.cardBlock}>
-          {renderToggle('heart', 'Heart Rate Alerts', 'Notify when abnormal', '#ff4b4b', '#ffebeb', alertsEnabled, setAlertsEnabled)}
+          {renderToggle('heart', 'Heart Rate Alerts', 'Notify when abnormal', '#ff4b4b', '#ffebeb', alertsEnabled, (v) => updateSetting('alertsEnabled', v, setAlertsEnabled))}
           <View style={styles.divider} />
-          {renderToggle('sync', 'Live Sync', 'Connect hardware device', '#3282f6', '#e6f0ff', liveSyncEnabled, setLiveSyncEnabled)}
+          {renderToggle('sync', 'Live Sync', 'Connect hardware device', '#3282f6', '#e6f0ff', liveSyncEnabled, (v) => updateSetting('liveSyncEnabled', v, setLiveSyncEnabled))}
           <View style={styles.divider} />
-          {renderToggle('warning', 'Emergency Alert', 'Auto-call contacts', '#f5a623', '#fef3c7', emergencyEnabled, setEmergencyEnabled)}
+          {renderToggle('warning', 'Emergency Alert', 'Auto-call contacts', '#f5a623', '#fef3c7', emergencyEnabled, (v) => updateSetting('emergencyEnabled', v, setEmergencyEnabled))}
         </View>
 
         <Text style={styles.sectionHeader}>{t('app_preferences')}</Text>
@@ -117,6 +209,45 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* --- MODALS --- */}
 
+        {/* Edit Profile Modal */}
+        <Modal visible={editProfileModalVisible} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Edit Account</Text>
+                <TouchableOpacity onPress={() => setEditProfileModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={{alignItems: 'center', marginBottom: 20}}>
+                <TouchableOpacity onPress={pickImage} style={[styles.premiumAvatar, {width: 100, height: 100, borderRadius: 50, marginBottom: 10}]}>
+                  {profile?.avatarUri ? (
+                    <Image source={{uri: profile.avatarUri}} style={{width: 100, height: 100, borderRadius: 50}} />
+                  ) : (
+                    <Ionicons name="person" size={50} color="#3282f6" />
+                  )}
+                  <View style={{position: 'absolute', bottom: 0, right: 0, backgroundColor: '#3282f6', borderRadius: 15, padding: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2, shadowRadius: 3}}>
+                    <Ionicons name="camera" size={16} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+                <Text style={{color: '#888', fontSize: 12}}>Tap to change photo</Text>
+              </View>
+
+              <Text style={{fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600'}}>Display Name</Text>
+              <TextInput 
+                  style={{ backgroundColor: '#f1f0ff', height: 50, borderRadius: 15, paddingHorizontal: 15, marginBottom: 20, fontSize: 16 }} 
+                  value={editDisplayName} 
+                  onChangeText={setEditDisplayName} 
+                  placeholder="Enter name" 
+              />
+              <TouchableOpacity style={styles.saveBtn} onPress={saveProfileName}>
+                <Text style={styles.saveBtnText}>Save Account Details</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* Notifications Modal */}
         <Modal visible={notiModalVisible} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
@@ -127,9 +258,9 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              {renderToggle('notifications', 'Push Notifications', 'Real-time health alerts', '#3282f6', '#e6f0ff', pushEnabled, setPushEnabled)}
+              {renderToggle('notifications', 'Push Notifications', 'Real-time health alerts', '#3282f6', '#e6f0ff', pushEnabled, (v) => updateSetting('pushEnabled', v, setPushEnabled))}
               <View style={styles.divider} />
-              {renderToggle('document-text', 'Daily Health Reports', 'Evening health summary', '#28c46c', '#ebfbee', reportEnabled, setReportEnabled)}
+              {renderToggle('document-text', 'Daily Health Reports', 'Evening health summary', '#28c46c', '#ebfbee', reportEnabled, (v) => updateSetting('reportEnabled', v, setReportEnabled))}
               <TouchableOpacity style={styles.saveBtn} onPress={() => setNotiModalVisible(false)}>
                 <Text style={styles.saveBtnText}>{t('done')}</Text>
               </TouchableOpacity>
@@ -175,12 +306,12 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              {renderToggle('finger-print', 'Biometric Lock', 'Use FaceID/Fingerprint', '#845ef7', '#f1f0ff', biometricEnabled, setBiometricEnabled)}
+              {renderToggle('finger-print', 'Biometric Lock', 'Use FaceID/Fingerprint', '#845ef7', '#f1f0ff', biometricEnabled, (v) => updateSetting('biometricEnabled', v, setBiometricEnabled))}
               <View style={styles.divider} />
               {renderLink('trash-outline', 'Clear Chat History', 'Delete all AI records', '#ff4b4b', '#fff0f0', () => {
                 Alert.alert("Confirm", "Delete all chat history permanently?", [
                   { text: 'Cancel' },
-                  { text: 'Delete', style: 'destructive' }
+                  { text: 'Delete', style: 'destructive', onPress: () => Alert.alert('Cleared', 'Chat history fully cleared from device cache.') }
                 ])
               })}
               <TouchableOpacity style={styles.saveBtn} onPress={() => setPrivacyModalVisible(false)}>

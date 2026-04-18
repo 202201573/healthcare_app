@@ -5,20 +5,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import api from '../services/api';
+import RiskPredictor from '../ml/RiskPredictor';
+import { SensorContext } from '../context/SensorContext';
 import { LanguageContext } from '../context/LanguageContext';
 
 const DashboardScreen = () => {
   const { t } = useContext(LanguageContext);
+  const { liveBpm, liveSpo2, liveSys, liveDia, liveTemp } = useContext(SensorContext);
   const [healthData, setHealthData] = useState(null);
   const [allHistory, setAllHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Analytics State
-  const [pulseScore, setPulseScore] = useState(94);
-  const [aiInsight, setAiInsight] = useState('Your health is looking great! No major risks detected today.');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -42,43 +41,9 @@ const DashboardScreen = () => {
       setAllHistory(response.data);
       if (response.data.length > 0) {
         setHealthData(response.data[0]);
-        calculateAnalytics(response.data);
-      }
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const calculateAnalytics = (data) => {
-    if (data.length === 0) return;
-
-    // Pulse Score Calculation (Start with 100)
-    let score = 100;
-    const recent = data.slice(0, 10); // Take last 10 readings
-    
-    recent.forEach(item => {
-        if (item.status === 'critical') score -= 12;
-        if (item.status === 'warning') score -= 5;
-    });
-
-    // Check average heart rate
-    const avgHr = recent.reduce((sum, item) => sum + item.heart_rate, 0) / recent.length;
-    if (avgHr > 100 || avgHr < 60) score -= 10;
-
-    // Ensure score stays between 0 and 100
-    const finalScore = Math.max(0, Math.min(100, score));
-    setPulseScore(finalScore);
-
-    // AI Insight Logic
-    let insight = "Your vital trends are stable. Keep following your daily routine.";
-    if (finalScore < 60) {
-        insight = "Attention: Multiple high-risk events detected recently. Consult your doctor.";
-    } else if (finalScore < 85) {
-        insight = "Slight instability in your heart rate. Try to rest and stay hydrated.";
-    } else if (avgHr > 110) {
-        insight = "High resting heart rate detected. Avoid caffeine and intense exercise.";
-    }
-    setAiInsight(insight);
   };
 
   const handleManualEntry = async () => {
@@ -138,6 +103,37 @@ const DashboardScreen = () => {
 
   const riskHistory = allHistory.filter(item => item.status !== 'normal');
 
+  // Live ML Model Evaluation
+  const currentBpm = liveBpm;
+  const currentSpo2 = liveSpo2;
+  const mlPrediction = RiskPredictor.predict(currentBpm, currentSpo2);
+  
+  let dynamicPulseScore = 100 - Math.floor(Math.abs(80 - currentBpm) * 0.4);
+  let dynamicAiInsight = "Your live vital trends are stable and baseline adherence is strong. Keep following your daily routine.";
+
+  let riskColors = ['#28c46c', '#20a055'];
+  let riskIcon = 'checkmark-circle';
+  let riskDesc = "All vitals within normal parameters";
+  let iconColor = '#28c46c';
+
+  if (mlPrediction.riskLevel === 1) { 
+      riskColors = ['#f59f00', '#e09000'];
+      riskIcon = 'warning';
+      riskDesc = "Some vitals show instability";
+      iconColor = '#f59f00';
+      dynamicPulseScore -= 18;
+      dynamicAiInsight = "Attention: The live ML classifier detected slight instability in your physiological signs. Please hydrate and limit intense activities.";
+  } else if (mlPrediction.riskLevel === 2) { 
+      riskColors = ['#ff6b6b', '#ff4b4b'];
+      riskIcon = 'alert-circle';
+      riskDesc = "Critical vitals detected. Check history.";
+      iconColor = '#ff4b4b';
+      dynamicPulseScore -= 45;
+      dynamicAiInsight = "CRITICAL: The AI model detected significant distress markers based on active vitals. Seek medical consultation immediately.";
+  }
+  
+  dynamicPulseScore = Math.max(0, Math.min(100, dynamicPulseScore));
+
   return (
     <View style={styles.container}>
       {/* Small Header */}
@@ -156,22 +152,22 @@ const DashboardScreen = () => {
       >
         {/* Risk Level Banner */}
         <LinearGradient
-          colors={['#ff6b6b', '#ff4b4b']}
+          colors={riskColors}
           style={styles.riskBanner}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
         >
           <View style={styles.riskRow}>
             <View style={styles.riskIconCircle}>
-              <Ionicons name="pulse" size={24} color="#ff4b4b" />
+              <Ionicons name={riskIcon} size={24} color={iconColor} />
             </View>
             <View style={styles.riskInfo}>
               <Text style={styles.riskLabel}>{t('risk_level')}</Text>
-              <Text style={styles.riskTitle}>Low Risk ✓</Text>
-              <Text style={styles.riskDesc}>All vitals within normal range</Text>
+              <Text style={styles.riskTitle}>{mlPrediction.riskLabel}</Text>
+              <Text style={styles.riskDesc}>{riskDesc}</Text>
             </View>
             <View style={styles.riskValueBox}>
-              <Text style={styles.riskValueBig}>{healthData ? healthData.heart_rate : '86'}</Text>
+              <Text style={styles.riskValueBig}>{currentBpm}</Text>
               <Text style={styles.riskValueSmall}>bpm now</Text>
             </View>
           </View>
@@ -186,10 +182,10 @@ const DashboardScreen = () => {
                 <Ionicons name="heart" size={20} color="#ff4b4b" />
               </View>
               <View style={[styles.trendBadge, {backgroundColor: '#e5f8ed'}]}>
-                <Text style={[styles.trendText, {color: '#28c46c'}]}>+2%</Text>
+                <Text style={[styles.trendText, {color: '#28c46c'}]}>LIVE</Text>
               </View>
             </View>
-            <Text style={styles.cardValue}>{healthData ? healthData.heart_rate : '86'} <Text style={styles.cardUnit}>bpm</Text></Text>
+            <Text style={styles.cardValue}>{liveBpm} <Text style={styles.cardUnit}>bpm</Text></Text>
             <Text style={styles.cardLabel}>Heart Rate</Text>
           </View>
 
@@ -199,11 +195,11 @@ const DashboardScreen = () => {
               <View style={[styles.iconWrap, {backgroundColor: '#e6f0ff'}]}>
                 <Ionicons name="water" size={20} color="#3282f6" />
               </View>
-              <View style={[styles.trendBadge, {backgroundColor: '#fff0f0'}]}>
-                <Text style={[styles.trendText, {color: '#ff4b4b'}]}>-1%</Text>
+              <View style={[styles.trendBadge, {backgroundColor: '#e5f8ed'}]}>
+                <Text style={[styles.trendText, {color: '#28c46c'}]}>LIVE</Text>
               </View>
             </View>
-            <Text style={styles.cardValue}>{healthData ? `${healthData.blood_pressure_sys}/${healthData.blood_pressure_dia}` : '120/80'}</Text>
+            <Text style={styles.cardValue}>{liveSys}/{liveDia}</Text>
             <Text style={styles.cardLabel}>Blood Pressure</Text>
           </View>
         </View>
@@ -216,10 +212,10 @@ const DashboardScreen = () => {
                 <Ionicons name="leaf" size={20} color="#28c46c" />
               </View>
               <View style={[styles.trendBadge, {backgroundColor: '#e5f8ed'}]}>
-                <Text style={[styles.trendText, {color: '#28c46c'}]}>+5%</Text>
+                <Text style={[styles.trendText, {color: '#28c46c'}]}>LIVE</Text>
               </View>
             </View>
-            <Text style={styles.cardValue}>{healthData ? healthData.sp02 : '98'} <Text style={styles.cardUnit}>%</Text></Text>
+            <Text style={styles.cardValue}>{liveSpo2} <Text style={styles.cardUnit}>%</Text></Text>
             <Text style={styles.cardLabel}>SpO2</Text>
           </View>
 
@@ -230,10 +226,10 @@ const DashboardScreen = () => {
                 <Ionicons name="thermometer" size={20} color="#d97706" />
               </View>
               <View style={[styles.trendBadge, {backgroundColor: '#e5f8ed'}]}>
-                <Text style={[styles.trendText, {color: '#28c46c'}]}>Norm</Text>
+                <Text style={[styles.trendText, {color: '#28c46c'}]}>LIVE</Text>
               </View>
             </View>
-            <Text style={styles.cardValue}>{healthData ? healthData.temperature : '36.6'} <Text style={styles.cardUnit}>°C</Text></Text>
+            <Text style={styles.cardValue}>{liveTemp} <Text style={styles.cardUnit}>°C</Text></Text>
             <Text style={styles.cardLabel}>Temp</Text>
           </View>
         </View>
@@ -251,14 +247,14 @@ const DashboardScreen = () => {
             <View style={styles.scoreRow}>
                 <View style={styles.scoreLeft}>
                    <Text style={styles.scoreSubTitle}>{t('pulse_score')}</Text>
-                   <Text style={[styles.scoreValueBig, {color: pulseScore > 80 ? '#28c46c' : (pulseScore > 50 ? '#f59f00' : '#ff4b4b')}]}>
-                       {pulseScore}
+                   <Text style={[styles.scoreValueBig, {color: dynamicPulseScore > 80 ? '#28c46c' : (dynamicPulseScore > 50 ? '#f59f00' : '#ff4b4b')}]}>
+                       {dynamicPulseScore}
                    </Text>
                    <Text style={styles.scoreOutOf}>/100 points</Text>
                 </View>
                 <View style={styles.scoreRight}>
-                    <View style={[styles.pulseCircle, {borderColor: pulseScore > 80 ? '#e5f8ed' : (pulseScore > 50 ? '#fff9db' : '#ffebeb')}]}>
-                        <Ionicons name="shield-checkmark" size={32} color={pulseScore > 80 ? '#28c46c' : (pulseScore > 50 ? '#f59f00' : '#ff4b4b')} />
+                    <View style={[styles.pulseCircle, {borderColor: dynamicPulseScore > 80 ? '#e5f8ed' : (dynamicPulseScore > 50 ? '#fff9db' : '#ffebeb')}]}>
+                        <Ionicons name="shield-checkmark" size={32} color={dynamicPulseScore > 80 ? '#28c46c' : (dynamicPulseScore > 50 ? '#f59f00' : '#ff4b4b')} />
                     </View>
                 </View>
             </View>
@@ -268,7 +264,7 @@ const DashboardScreen = () => {
                     <Ionicons name="sparkles" size={16} color="#3282f6" />
                     <Text style={styles.insightHeaderText}>AI INSIGHT</Text>
                 </View>
-                <Text style={styles.insightText}>{aiInsight}</Text>
+                <Text style={styles.insightText}>{dynamicAiInsight}</Text>
             </View>
         </LinearGradient>
 
