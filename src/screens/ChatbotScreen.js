@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert, Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -25,8 +26,13 @@ const ChatbotScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchMessages();
-    fetchUserProfile();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserProfile();
+    }, [])
+  );
 
   const fetchUserProfile = async () => {
     try {
