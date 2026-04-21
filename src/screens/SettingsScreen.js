@@ -11,22 +11,22 @@ import { LanguageContext } from '../context/LanguageContext';
 const SettingsScreen = ({ navigation }) => {
   const { logout } = useContext(AuthContext);
   const { t, locale, changeLanguage } = useContext(LanguageContext);
-  
+
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [liveSyncEnabled, setLiveSyncEnabled] = useState(true);
   const [emergencyEnabled, setEmergencyEnabled] = useState(false);
 
-  // New states for interactive sections
+
   const [notiModalVisible, setNotiModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [langModalVisible, setLangModalVisible] = useState(false);
-  
-  // Specific settings states
+
+
   const [pushEnabled, setPushEnabled] = useState(true);
   const [reportEnabled, setReportEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-  
-  // Profile Data
+
+
   const [profile, setProfile] = useState(null);
   const [editProfileModalVisible, setEditProfileModalVisible] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -40,14 +40,12 @@ const SettingsScreen = ({ navigation }) => {
   const loadSettings = async () => {
     try {
       const currentUsername = await AsyncStorage.getItem('current_username');
-      
-      // Load user profile details
       const usersStr = await AsyncStorage.getItem('app_users_db');
       const users = usersStr ? JSON.parse(usersStr) : [];
       let currentUser = users.find(u => u.username === currentUsername);
       if (currentUser) {
-         setProfile(currentUser);
-         setEditDisplayName(currentUser.displayName || currentUser.username);
+        setProfile(currentUser);
+        setEditDisplayName(currentUser.displayName || currentUser.username);
       }
 
       const settingsStr = await AsyncStorage.getItem(`app_settings_${currentUsername}`);
@@ -73,7 +71,7 @@ const SettingsScreen = ({ navigation }) => {
       let s = settingsStr ? JSON.parse(settingsStr) : {};
       s[key] = val;
       await AsyncStorage.setItem(`app_settings_${currentUsername}`, JSON.stringify(s));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const pickImage = async () => {
@@ -120,29 +118,29 @@ const SettingsScreen = ({ navigation }) => {
 
   const renderToggle = (icon, title, sub, iconColor, bg, value, onValueChange) => (
     <View style={styles.menuItem}>
-      <View style={[styles.menuIconWrap, {backgroundColor: bg}]}>
+      <View style={[styles.menuIconWrap, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
       <View style={styles.menuTextWrap}>
         <Text style={styles.menuTitle}>{title}</Text>
         <Text style={styles.menuSub}>{sub}</Text>
       </View>
-      <Switch 
-         value={value} 
-         onValueChange={onValueChange} 
-         trackColor={{ false: '#e5e5ea', true: '#34c759' }}
-         thumbColor="#fff"
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: '#e5e5ea', true: '#34c759' }}
+        thumbColor="#fff"
       />
     </View>
   );
 
   const renderLink = (icon, title, sub, iconColor, bg, onPress) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <View style={[styles.menuIconWrap, {backgroundColor: bg}]}>
+      <View style={[styles.menuIconWrap, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={20} color={iconColor} />
       </View>
       <View style={styles.menuTextWrap}>
-        <Text style={[styles.menuTitle, {color: iconColor === '#ff4b4b' ? '#ff4b4b' : '#333'}]}>{title}</Text>
+        <Text style={[styles.menuTitle, { color: iconColor === '#ff4b4b' ? '#ff4b4b' : '#333' }]}>{title}</Text>
         {sub && <Text style={styles.menuSub}>{sub}</Text>}
       </View>
       <Ionicons name="chevron-forward" size={20} color="#ccc" />
@@ -152,15 +150,15 @@ const SettingsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{marginRight: 15}}>
-                <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>{t('settings')}</Text>
-              <Text style={styles.headerSub}>Customize your experience</Text>
-            </View>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginRight: 15 }}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>{t('settings')}</Text>
+            <Text style={styles.headerSub}>Customize your experience</Text>
+          </View>
         </View>
 
         <LinearGradient
@@ -171,9 +169,9 @@ const SettingsScreen = ({ navigation }) => {
         >
           <View style={styles.premiumAvatar}>
             {profile?.avatarUri ? (
-               <Image source={{uri: profile.avatarUri}} style={{width: 50, height: 50, borderRadius: 25}} />
+              <Image source={{ uri: profile.avatarUri }} style={{ width: 50, height: 50, borderRadius: 25 }} />
             ) : (
-               <Ionicons name="person" size={24} color="#3282f6" />
+              <Ionicons name="person" size={24} color="#3282f6" />
             )}
           </View>
           <View style={styles.premiumInfo}>
@@ -181,7 +179,7 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={styles.premiumSub}>{profile ? profile.email : 'Premium Plan'}</Text>
           </View>
           <TouchableOpacity style={styles.editBtn} onPress={() => setEditProfileModalVisible(true)}>
-             <Ionicons name="pencil" size={16} color="#3282f6" />
+            <Ionicons name="pencil" size={16} color="#3282f6" />
           </TouchableOpacity>
         </LinearGradient>
 
@@ -219,27 +217,27 @@ const SettingsScreen = ({ navigation }) => {
                   <Ionicons name="close" size={24} color="#333" />
                 </TouchableOpacity>
               </View>
-              
-              <View style={{alignItems: 'center', marginBottom: 20}}>
-                <TouchableOpacity onPress={pickImage} style={[styles.premiumAvatar, {width: 100, height: 100, borderRadius: 50, marginBottom: 10}]}>
+
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <TouchableOpacity onPress={pickImage} style={[styles.premiumAvatar, { width: 100, height: 100, borderRadius: 50, marginBottom: 10 }]}>
                   {profile?.avatarUri ? (
-                    <Image source={{uri: profile.avatarUri}} style={{width: 100, height: 100, borderRadius: 50}} />
+                    <Image source={{ uri: profile.avatarUri }} style={{ width: 100, height: 100, borderRadius: 50 }} />
                   ) : (
                     <Ionicons name="person" size={50} color="#3282f6" />
                   )}
-                  <View style={{position: 'absolute', bottom: 0, right: 0, backgroundColor: '#3282f6', borderRadius: 15, padding: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2, shadowRadius: 3}}>
+                  <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#3282f6', borderRadius: 15, padding: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 }}>
                     <Ionicons name="camera" size={16} color="#fff" />
                   </View>
                 </TouchableOpacity>
-                <Text style={{color: '#888', fontSize: 12}}>Tap to change photo</Text>
+                <Text style={{ color: '#888', fontSize: 12 }}>Tap to change photo</Text>
               </View>
 
-              <Text style={{fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600'}}>Display Name</Text>
-              <TextInput 
-                  style={{ backgroundColor: '#f1f0ff', height: 50, borderRadius: 15, paddingHorizontal: 15, marginBottom: 20, fontSize: 16 }} 
-                  value={editDisplayName} 
-                  onChangeText={setEditDisplayName} 
-                  placeholder="Enter name" 
+              <Text style={{ fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600' }}>Display Name</Text>
+              <TextInput
+                style={{ backgroundColor: '#f1f0ff', height: 50, borderRadius: 15, paddingHorizontal: 15, marginBottom: 20, fontSize: 16 }}
+                value={editDisplayName}
+                onChangeText={setEditDisplayName}
+                placeholder="Enter name"
               />
               <TouchableOpacity style={styles.saveBtn} onPress={saveProfileName}>
                 <Text style={styles.saveBtnText}>Save Account Details</Text>
@@ -279,9 +277,9 @@ const SettingsScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
               {['English', 'العربية (Arabic)', 'Français (French)', 'Español (Spanish)'].map((lang, idx) => (
-                <TouchableOpacity 
-                  key={idx} 
-                  style={styles.langItem} 
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.langItem}
                   onPress={() => {
                     const newLocale = lang.includes('Arabic') ? 'ar' : 'en';
                     changeLanguage(newLocale);

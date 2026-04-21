@@ -18,11 +18,11 @@ const SignupScreen = ({ navigation }) => {
         Alert.alert('Error', 'Username and password are required');
         return;
       }
-      
+
       let finalGender = gender ? gender.toUpperCase().trim().charAt(0) : '';
       if (!['M', 'F', 'O', ''].includes(finalGender)) {
         Alert.alert('Error', 'Gender must be M, F, or O');
-        return; 
+        return;
       }
 
       await register({ username, email, password, age: parseInt(age) || null, gender: finalGender });
@@ -34,7 +34,7 @@ const SignupScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
-        
+
         {/* Curved Header */}
         <LinearGradient
           colors={['#4ba1ff', '#2d7df6']}
@@ -49,7 +49,7 @@ const SignupScreen = ({ navigation }) => {
 
         {/* Input Form */}
         <View style={styles.formContainer}>
-          
+
           <View style={styles.inputWrapper}>
             <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
             <TextInput
@@ -88,30 +88,30 @@ const SignupScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.rowInputs}>
-             <View style={[styles.inputWrapper, { flex: 0.48 }]}>
-                <Ionicons name="calendar-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Age"
-                  value={age}
-                  onChangeText={setAge}
-                  keyboardType="numeric"
-                  placeholderTextColor="#bbb"
-                />
-              </View>
-              <View style={[styles.inputWrapper, { flex: 0.48 }]}>
-                <Ionicons name="male-female-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="M / F / O"
-                  value={gender}
-                  onChangeText={setGender}
-                  placeholderTextColor="#bbb"
-                />
-              </View>
+            <View style={[styles.inputWrapper, { flex: 0.48 }]}>
+              <Ionicons name="calendar-outline" size={20} color="#888" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Age"
+                value={age}
+                onChangeText={setAge}
+                keyboardType="numeric"
+                placeholderTextColor="#bbb"
+              />
+            </View>
+            <View style={[styles.inputWrapper, { flex: 0.48 }]}>
+              <Ionicons name="male-female-outline" size={20} color="#888" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="M / F / O"
+                value={gender}
+                onChangeText={setGender}
+                placeholderTextColor="#bbb"
+              />
+            </View>
           </View>
 
-          <TouchableOpacity onPress={handleSignup} activeOpacity={0.8} style={{marginTop: 30}}>
+          <TouchableOpacity onPress={handleSignup} activeOpacity={0.8} style={{ marginTop: 30 }}>
             <LinearGradient
               colors={['#4ca0ff', '#3282f6']}
               style={styles.primaryButton}
