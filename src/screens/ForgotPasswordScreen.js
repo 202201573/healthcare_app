@@ -13,7 +13,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
   }, []);
 
   const showCodeNotification = async (code) => {
-    // Fallback for Expo Go compatibility instead of crashing Native Core
     Alert.alert("📱 SYSTEM NOTIFICATION", `Your CardioGo verification code is: ${code}. Do not share this with anyone!`);
   };
 

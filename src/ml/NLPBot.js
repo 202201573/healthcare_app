@@ -1,4 +1,5 @@
 import RiskPredictor from './RiskPredictor';
+import chatbotData from './chatbot_dataset.json';
 
 class NLPBot {
     constructor() {
@@ -8,113 +9,7 @@ class NLPBot {
             'ألم', 'وجع', 'خائف', 'خوف', 'سيء', 'أسوأ', 'طوارئ', 'موت', 'مريض', 'مرض', 'توتر', 'قلق', 'مصاب'
         ]);
         
-        this.intents = [
-            {
-                tag: 'greeting',
-                patterns_en: ['hi', 'hello', 'hey', 'start', 'good morning', 'good evening', 'how are you', 'howdy'],
-                patterns_ar: ['مرحبا', 'أهلا', 'هلا', 'صباح الخير', 'مساء الخير', 'كيف حالك', 'السلام عليكم', 'سلام', 'تفضل'],
-                responses_en: ['Hello! I am PulseGuard AI. How can I assist you with your health today?', 'Hi there! What can I analyze for you today?'],
-                responses_ar: ['مرحباً! أنا المساعد الذكي PulseGuard. كيف يمكنني مساعدتك اليوم بخصوص صحتك؟', 'أهلاً بك! ماذا تريد أن أحلل لك اليوم؟']
-            },
-            {
-                tag: 'ask_heart_rate',
-                patterns_en: ['what is my heart rate', 'heart rate', 'bpm', 'how is my pulse', 'check my heart', 'pulse', 'heart'],
-                patterns_ar: ['ما هو معدل نبضات قلبي', 'سرعة ضربات القلب', 'نبض', 'قلب', 'دقات القلب', 'كم نبضي'],
-                responses_en: ['Your live heart rate is {bpm} BPM. A normal resting heart rate for adults ranges from 60 to 100 beats per minute.'],
-                responses_ar: ['معدل ضربات قلبك الحالي هو {bpm} نبضة في الدقيقة. المعدل الطبيعي للبالغين يتراوح بين 60 إلى 100 نبضة.']
-            },
-            {
-                tag: 'ask_spo2',
-                patterns_en: ['what is my oxygen', 'spo2', 'oxygen level', 'blood oxygen', 'is my oxygen normal', 'oxygen', 'saturation'],
-                patterns_ar: ['ما هو مستوى الأكسجين', 'أكسجين', 'مستوى الأكسجين', 'اكسجين الدم', 'نسبة الأكسجين', 'spo2'],
-                responses_en: ['Your current SpO2 level is {spo2}%. Normal oxygen saturation values are typically between 95% and 100%.'],
-                responses_ar: ['مستوى الأكسجين الحالي في دمك هو {spo2}%. نسبة الأكسجين الطبيعية تتراوح عادة بين 95% و 100%.']
-            },
-            {
-                tag: 'ask_blood_pressure',
-                patterns_en: ['what is my blood pressure', 'bp', 'blood pressure', 'systolic', 'diastolic', 'pressure'],
-                patterns_ar: ['كم ضغط دمي', 'ضغط الدم', 'الضغط', 'ضغط'],
-                responses_en: ['Your blood pressure is currently {sys}/{dia} mmHg. Ideal blood pressure is usually considered to be between 90/60mmHg and 120/80mmHg.'],
-                responses_ar: ['ضغط دمك الحالي هو {sys}/{dia} mmHg. ضغط الدم المثالي يعتبر عادة بين 90/60 و 120/80.']
-            },
-            {
-                tag: 'ask_temp',
-                patterns_en: ['what is my temperature', 'body temp', 'fever', 'temperature', 'am i hot', 'temp'],
-                patterns_ar: ['كم درجة حرارتي', 'درجة الحرارة', 'حرارة', 'حمى', 'هل أعاني من حمى', 'حرارتي'],
-                responses_en: ['Your body temperature is {temp}°C. Normal body temperature is usually around 37°C (98.6°F).'],
-                responses_ar: ['درجة حرارة جسمك هي {temp}°C. درجة الحرارة الطبيعية للجسم تكون عادة حوالي 37 مئوية.']
-            },
-            {
-                tag: 'ask_risk',
-                patterns_en: ['am i at risk', 'risk analysis', 'health risk', 'heart disease risk', 'is my health okay', 'status', 'how am i doing', 'risk', 'disease', 'condition'],
-                patterns_ar: ['هل أنا في خطر', 'تحليل المخاطر', 'خطر صحي', 'خطر أمراض القلب', 'كيف حالتي الصحية', 'حالة', 'مخاطر', 'مرض'],
-                responses_en: ['Based on your live vitals, your current risk assessment is: {risk}.', 'My ML analysis shows you are currently at: {risk}. This takes into account your live BPM of {bpm} and SpO2 of {spo2}%.'],
-                responses_ar: ['بناءً على مؤشراتك الحيوية، مستوى الخطر الصحي لديك هو: {risk}.', 'أظهر تحليل الذكاء الاصطناعي أن حالتك الآن: {risk}. هذا يأخذ في الاعتبار نبضك ({bpm}) ونسبة الأكسجين ({spo2}%).']
-            },
-            {
-                tag: 'app_usage',
-                patterns_en: ['how do i use this app', 'app info', 'what does this app do', 'help', 'features', 'how to use', 'explain app', 'app', 'guide'],
-                patterns_ar: ['كيف أستخدم هذا التطبيق', 'معلومات التطبيق', 'ماذا يفعل هذا التطبيق', 'مساعدة', 'المميزات', 'تطبيق', 'دليل'],
-                responses_en: ['PulseGuard tracks your live vitals like BPM and SpO2 using connected sensors, and uses an advanced AI backend to predict health risks in real-time.'],
-                responses_ar: ['يقوم تطبيق PulseGuard بتتبع مؤشراتك الحيوية مثل نبض القلب والأكسجين باستخدام أجهزة استشعار متصلة، ويستخدم الذكاء الاصطناعي للتنبؤ بالمخاطر الصحية.']
-            },
-            {
-                tag: 'sleep_tips',
-                patterns_en: ['give me 5 sleep tips', 'how to sleep better', 'sleep tips', 'insomnia', 'can not sleep', 'sleep well', 'sleep', 'tired'],
-                patterns_ar: ['أعطني نصائح للنوم', 'كيف أنام بشكل أفضل', 'نصائح النوم', 'أرق', 'لا أستطيع النوم', 'نوم', 'تعبان', 'نعاس'],
-                responses_en: ['Here are 5 tips for better sleep:\n1. Stick to a sleep schedule.\n2. Pay attention to what you eat and drink.\n3. Create a restful environment.\n4. Limit daytime naps.\n5. Include physical activity in your daily routine.'],
-                responses_ar: ['إليك 5 نصائح لنوم أفضل:\n1. الالتزام بموعد محدد للنوم.\n2. الانتباه لما تأكله وتشربه.\n3. توفير بيئة مريحة.\n4. التقليل من قيلولة النهار.\n5. ممارسة النشاط البدني بانتظام.']
-            },
-            {
-                tag: 'data_insight',
-                patterns_en: ['explain my health data', 'data insight', 'latest health data', 'what do my numbers mean', 'insight', 'data', 'explain', 'analytics'],
-                patterns_ar: ['اشرح بياناتي الصحية', 'نظرة على البيانات', 'ماذا تعني أرقامي', 'بصيرة', 'بيانات', 'شرح', 'إحصائيات'],
-                responses_en: ['Your vitals provide a snapshot of your cardiovascular system. A BPM around {bpm} and SpO2 at {spo2}% indicate how efficiently your heart works and oxygen is delivered.'],
-                responses_ar: ['توفر مؤشراتك الحيوية نظرة عامة على صحة قلبك. معدل ضربات القلب {bpm} ونسبة الأكسجين {spo2}% تدل على كفاءة عمل قلبك.']
-            },
-            {
-                tag: 'schedule',
-                patterns_en: ['schedule for me', 'health schedule', '7 day schedule', 'routine', 'plan', 'schedule', 'daily routine'],
-                patterns_ar: ['جدول زمني لي', 'جدول صحي', 'روتين سريع', 'خطة', 'جدول', 'روتين يومي'],
-                responses_en: ['A general health schedule: Wake up at 7AM, drink water, 30 min light exercise. Eat a balanced breakfast. Walk occasionally during work. Dinner by 7PM. Wind down by 10PM for 8 hours of sleep.'],
-                responses_ar: ['جدول صحي مقترح: استيقظ في 7 صباحاً، اشرب ماء، مارس رياضة خفيفة لـ30 دقيقة. تناول فطور متوازن. امشِ خلال العمل. العشاء في 7 مساءً. استرح في 10 مساءً لنوم 8 ساعات.']
-            },
-            {
-                tag: 'diet_advice',
-                patterns_en: ['what should i eat', 'diet advice', 'healthy food', 'nutrition', 'food', 'diet', 'lose weight', 'meals'],
-                patterns_ar: ['ماذا يجب أن آكل', 'نصيحة غذائية', 'طعام صحي', 'تغذية', 'أكل', 'حمية', 'وزن', 'وجبات'],
-                responses_en: ['For a healthy heart, focus on fruits, vegetables, whole grains, and lean proteins. Limit saturated fats, sodium, and added sugars. Stay hydrated!'],
-                responses_ar: ['لقلب صحي، ركز على الفواكه، الخضروات، الحبوب الكاملة، والبروتينات الخالية من الدهون. قلل من الدهون المشبعة، الصوديوم، والسكريات، واشرب الكثير من الماء!']
-            },
-            {
-                tag: 'exercise_tips',
-                patterns_en: ['workout plan', 'exercise tips', 'fitness', 'how to workout', 'gym', 'training', 'cardio', 'exercise'],
-                patterns_ar: ['خطة تمرين', 'نصائح رياضية', 'لياقة', 'كيف أتمرن', 'نادي', 'تدريب', 'رياضة', 'تمارين'],
-                responses_en: ['Aim for at least 150 minutes of moderate aerobic activity or 75 minutes of vigorous activity a week. Try brisk walking, swimming, or cycling!'],
-                responses_ar: ['استهدف ممارسة 150 دقيقة من النشاط المعتدل، أو 75 دقيقة من النشاط المكثف أسبوعياً. جرب المشي السريع، السباحة، أو ركوب الدراجة!']
-            },
-            {
-                tag: 'first_aid',
-                patterns_en: ['emergency', 'first aid', 'heart attack symptoms', 'cpr', 'help me', 'pain in chest', 'hurt'],
-                patterns_ar: ['طوارئ', 'إسعاف أولي', 'أعراض نوبة قلبية', 'أنقذني', 'وجع في الصدر', 'ألم', 'النجدة'],
-                responses_en: ['⚠️ IF THIS IS A MEDICAL EMERGENCY, CALL YOUR LOCAL EMERGENCY NUMBER IMMEDIATELY. Signs of a heart attack include chest pain, shortness of breath, and pain in arms or neck.'],
-                responses_ar: ['⚠️ إذا كانت هذه حالة طارئة، اتصل برقم الإسعاف المحلي فوراً. من علامات النوبة القلبية: ألم الصدر، ضيق التنفس، وألم في الذراعين أو الرقبة.']
-            },
-            {
-                tag: 'stress_relief',
-                patterns_en: ['i am stressed', 'stress relief', 'anxiety', 'feel anxious', 'calm down', 'meditation', 'stress'],
-                patterns_ar: ['أنا متوتر', 'تخفيف التوتر', 'قلق', 'أشعر بالقلق', 'أهدأ', 'تأمل', 'توتر'],
-                responses_en: ['To relieve stress, try deep breathing exercises (inhale for 4s, hold for 4s, exhale for 6s). Stepping away to meditate can help lower your heart rate, which is currently at {bpm} BPM.'],
-                responses_ar: ['لتخفيف التوتر، جرب تمارين التنفس العميق (شهيق لـ4 ثوانٍ، كتم لـ4 ثوانٍ، زفير لـ6 ثوانٍ). التأمل قد يخفض معدل ضربات قلبك، وهو الآن {bpm}.']
-            },
-            {
-                tag: 'follow_up',
-                patterns_en: ['is that high', 'is that normal', 'is that bad', 'is that okay', 'explain more', 'what does that mean', 'why'],
-                patterns_ar: ['هل هذا مرتفع', 'هل هذا طبيعي', 'هل هذا سيء', 'هل يعقل هذا', 'اشرح لي أكثر', 'ماذا يعني', 'لماذا'],
-                responses_en: [], 
-                responses_ar: [] 
-            }
-        ];
+        this.intents = chatbotData.intents;
 
         this.stopWordsEn = new Set(["a", "an", "the", "and", "or", "but", "is", "are", "am", "it", "to", "for", "with", "my", "of", "in", "on", "what", "how", "do", "i", "me", "this", "that"]);
         this.stopWordsAr = new Set(["في", "من", "على", "إلى", "عن", "مع", "هل", "ما", "كيف", "و", "أو", "هو", "هي", "أنا", "يا"]);
@@ -156,9 +51,9 @@ class NLPBot {
             for (let j = 1; j <= b.length; j += 1) {
                 let cost = a[i - 1] === b[j - 1] ? 0 : 1;
                 matrix[i][j] = Math.min(
-                    matrix[i - 1][j] + 1, // deletion
-                    matrix[i][j - 1] + 1, // insertion
-                    matrix[i - 1][j - 1] + cost // substitution
+                    matrix[i - 1][j] + 1, 
+                    matrix[i][j - 1] + 1, 
+                    matrix[i - 1][j - 1] + cost 
                 );
             }
         }
@@ -181,7 +76,7 @@ class NLPBot {
     }
 
     stem(word) {
-        if (this.isArabic(word)) return word; // Do not apply english stemming rules to Arabic text
+        if (this.isArabic(word)) return word; // not apply english stemming in Arabic text
         if (word.endsWith('ing') && word.length > 4) return word.replace(/ing$/, '');
         if (word.endsWith('es') && word.length > 4) return word.replace(/es$/, '');
         if (word.endsWith('s') && word.length > 3 && !word.endsWith('ss')) return word.replace(/s$/, '');
@@ -275,7 +170,7 @@ class NLPBot {
                 case 'ask_blood_pressure':
                     return "الضغط الصحي يكون بين 90/60 و 120/80. إذا كان خارج هذا النطاق بشكل كبير فقد يشير لارتفاع أو انخفاض.";
                 case 'ask_risk':
-                    return "يتم حساب الخطر عبر نموذج ذكاء اصطناعي (الانحدار اللوجستي) والذي يقارن نمط نبضك والأكسجين مع بيانات طبية واسعة.";
+                    return "يتم حساب الخطر عبر نموذج CatBoost (Gradient Boosting) المتقدم، والذي يحلل نبضك، ونسبة الأكسجين، وضغط الدم، والحرارة بدقة.";
                 default:
                     return "عذرًا، يبدو أنني فقدت مسار الموضوع. هل يمكنك إعادة سؤالك؟";
             }
@@ -288,7 +183,7 @@ class NLPBot {
                 case 'ask_blood_pressure':
                     return "A healthy bracket is 90/60 to 120/80. If yours is wildly outside this bracket, it may indicate hypertension (high) or hypotension (low).";
                 case 'ask_risk':
-                    return "Your risk is calculated via an AI Logistic Regression model matching your oxygen and heart rate patterns against large cardiovascular datasets.";
+                    return "Your risk is calculated via an advanced CatBoost (Gradient Boosting) model that analyzes your heart rate, oxygen, blood pressure, and temperature.";
                 default:
                     return "I'm sorry, I seem to have lost track of our topic. Could you please ask your original question again?";
             }
@@ -330,7 +225,7 @@ class NLPBot {
         let responseText = this.getRandomResponse(intentTag, lang);
 
         if (responseText) {
-             const mlPrediction = RiskPredictor.predict(liveData.bpm, liveData.spo2);
+             const mlPrediction = RiskPredictor.predict(liveData.bpm, liveData.spo2, liveData.sys, liveData.temp);
              
              let riskTranslated = mlPrediction.riskLabel;
              if (lang === 'ar') {

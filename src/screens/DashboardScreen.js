@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Vibration } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Vibration, Platform } from 'react-native';
 import * as Audio from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import RiskPredictor from '../ml/RiskPredictor';
 import { SensorContext } from '../context/SensorContext';
@@ -37,10 +38,11 @@ const DashboardScreen = () => {
 
   const fetchHealthData = async () => {
     try {
-      const response = await api.get('health/data/');
-      setAllHistory(response.data);
-      if (response.data.length > 0) {
-        setHealthData(response.data[0]);
+      const historyStr = await AsyncStorage.getItem('health_history');
+      const data = historyStr ? JSON.parse(historyStr) : [];
+      setAllHistory(data);
+      if (data.length > 0) {
+        setHealthData(data[0]);
       }
     } catch (e) {
       console.error(e);
@@ -50,7 +52,10 @@ const DashboardScreen = () => {
   const handleManualEntry = async () => {
     setIsSubmitting(true);
     try {
-      // Basic risk assessment for UI
+      // Always cancel any lingering vibrations first (e.g. if user bypassed alert)
+      Vibration.cancel();
+      if (global.vibrateInterval) clearInterval(global.vibrateInterval);
+
       const hr = parseInt(formData.heart_rate);
       const spo2 = parseInt(formData.sp02);
       let status = 'normal';
@@ -58,11 +63,13 @@ const DashboardScreen = () => {
       if (hr > 120 || hr < 50 || spo2 < 90) status = 'critical';
 
       if (status !== 'normal') {
-        // Continuous Alarm Logic
         if (status === 'critical') {
-            // Looping Vibration: [wait, vibrate, wait, vibrate...]
-            const pattern = [500, 500, 500, 500]; 
-            Vibration.vibrate(pattern, true); // true = LOOP
+            if (Platform.OS === 'ios') {
+                Vibration.vibrate();
+                global.vibrateInterval = setInterval(() => Vibration.vibrate(), 1000);
+            } else {
+                Vibration.vibrate([0, 500, 200, 500], true); 
+            }
         } else {
             // Single Warning Vibration
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -75,24 +82,30 @@ const DashboardScreen = () => {
             text: "I Understand", 
             style: "destructive",
             onPress: () => {
-                Vibration.cancel(); // STOPS the looping alarm
+                Vibration.cancel(); 
+                if (global.vibrateInterval) clearInterval(global.vibrateInterval);
             }
           }],
-          { cancelable: false } // Force user to click button
+          { cancelable: false } 
         );
       }
 
-      await api.post('health/data/', {
+      const newRecord = {
         ...formData,
-        heart_rate: parseInt(formData.heart_rate),
+        heart_rate: hr,
         blood_pressure_sys: parseInt(formData.blood_pressure_sys),
         blood_pressure_dia: parseInt(formData.blood_pressure_dia),
-        sp02: parseInt(formData.sp02),
+        sp02: spo2,
         temperature: parseFloat(formData.temperature),
-        status: status
-      });
+        status: status,
+        timestamp: new Date().toISOString()
+      };
+
+      const historyStr = await AsyncStorage.getItem('health_history');
+      const data = historyStr ? JSON.parse(historyStr) : [];
+      data.unshift(newRecord);
+      await AsyncStorage.setItem('health_history', JSON.stringify(data));
       
-      Alert.alert("Success", "Health record saved!");
       setEntryModalVisible(false);
       fetchHealthData();
     } catch (e) {
@@ -107,7 +120,9 @@ const DashboardScreen = () => {
   // Live ML Model Evaluation
   const currentBpm = liveBpm;
   const currentSpo2 = liveSpo2;
-  const mlPrediction = RiskPredictor.predict(currentBpm, currentSpo2);
+  const currentSys = liveSys;
+  const currentTemp = liveTemp;
+  const mlPrediction = RiskPredictor.predict(currentBpm, currentSpo2, currentSys, currentTemp);
   
   let dynamicPulseScore = 100 - Math.floor(Math.abs(80 - currentBpm) * 0.4);
   let dynamicAiInsight = "Your live vital trends are stable and baseline adherence is strong. Keep following your daily routine.";

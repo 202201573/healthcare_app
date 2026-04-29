@@ -12,43 +12,58 @@ export const SensorProvider = ({ children }) => {
   const [steps, setSteps] = useState(8542);
 
   useEffect(() => {
-    // Watch Sensor Simulation globally running every 2 seconds
+    let mode = 'normal'; 
+    let modeTicks = 0;
+
     const liveInterval = setInterval(() => {
+      if (modeTicks <= 0) {
+          const r = Math.random();
+          if (r < 0.15) { mode = 'critical'; modeTicks = 5; } // 10s of critical
+          else if (r < 0.35) { mode = 'elevated'; modeTicks = 8; } // 16s of elevated
+          else { mode = 'normal'; modeTicks = 15; } // 30s of normal
+      }
+      modeTicks--;
+
       setLiveBpm(prev => {
-        const change = Math.floor(Math.random() * 5) - 2;
-        const next = prev + change;
-        if (next < 65) return 65;
-        if (next > 115) return 115;
-        return next;
+        let target = 75;
+        if (mode === 'elevated') target = 105;
+        if (mode === 'critical') target = 135;
+        const change = (target - prev) * 0.3 + (Math.random() * 6 - 3);
+        return Math.round(prev + change);
       });
+
       setLiveSpo2(prev => {
-        const change = Math.floor(Math.random() * 3) - 1;
-        const next = prev + change;
-        if (next < 95) return 95;
-        if (next > 100) return 100;
-        return next;
+        let target = 98;
+        if (mode === 'elevated') target = 93;
+        if (mode === 'critical') target = 87;
+        const change = (target - prev) * 0.3 + (Math.random() * 2 - 1);
+        return Math.round(prev + change);
       });
+
       setLiveSys(prev => {
-        const change = Math.floor(Math.random() * 3) - 1;
-        const next = prev + change;
-        if (next < 115) return 115;
-        if (next > 125) return 125;
-        return next;
+        let target = 120;
+        if (mode === 'elevated') target = 135;
+        if (mode === 'critical') target = 155;
+        const change = (target - prev) * 0.3 + (Math.random() * 4 - 2);
+        return Math.round(prev + change);
       });
+
       setLiveDia(prev => {
-        const change = Math.floor(Math.random() * 3) - 1;
-        const next = prev + change;
-        if (next < 75) return 75;
-        if (next > 85) return 85;
-        return next;
+        let target = 80;
+        if (mode === 'elevated') target = 90;
+        if (mode === 'critical') target = 100;
+        const change = (target - prev) * 0.3 + (Math.random() * 4 - 2);
+        return Math.round(prev + change);
       });
+
       setLiveTemp(prev => {
-        const change = (Math.random() * 0.2 - 0.1);
-        const next = prev + change;
-        if (next < 36.4) return 36.4;
-        if (next > 37.2) return 37.2;
-        return Number(next.toFixed(1));
+        let target = 36.6;
+        if (mode === 'elevated') target = 37.6;
+        if (mode === 'critical') target = 38.8;
+        const change = (target - prev) * 0.2 + (Math.random() * 0.2 - 0.1);
+        return Number((prev + change).toFixed(1));
       });
+
       setCalories(prev => prev + (Math.random() > 0.5 ? 1 : 0));
       setSteps(prev => prev + Math.floor(Math.random() * 4));
     }, 2000);
